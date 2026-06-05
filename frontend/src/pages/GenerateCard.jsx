@@ -1,21 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { cardAPI, templateAPI, uploadAPI } from "../services/api";
 import CardPreview from "../components/CardPreview";
 import ExportButtons from "../components/ExportButtons";
-import {
-  getLocalGeneratedCardById,
-  upsertLocalGeneratedCard
-} from "../utils/localGeneratedCards";
 
 function GenerateCard() {
 
   
   const { templateId } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
 
-  const draftId = searchParams.get("draftId");
   const cardId = searchParams.get("cardId");
 
   const [templates, setTemplates] = useState([]);
@@ -24,7 +20,6 @@ function GenerateCard() {
   const [formData, setFormData] = useState({});
   const [qrData, setQrData] = useState("");
 
-  const [editingDraftId, setEditingDraftId] = useState("");
   const [editingSavedCardId, setEditingSavedCardId] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -32,12 +27,28 @@ function GenerateCard() {
 
 
  const DIGIVAL_HIDDEN_FIELDS = ["address", "website", "qr"];
+ const DIGIVAL_PHOTO_DEFAULTS = {
+  photoX: "0",
+  photoY: "0",
+  photoWidth: "300",
+  photoHeight: "346"
+};
+const DIGIVAL_PHOTO_ADJUST_FIELDS = [
+  { key: "photoX", label: "X", min: -80, max: 80 },
+  { key: "photoY", label: "Y", min: -80, max: 80 },
+  { key: "photoWidth", label: "Width", min: 180, max: 440 },
+  { key: "photoHeight", label: "Height", min: 220, max: 520 }
+];
 
 const isHiddenDigiValField = field => {
   return (
     selectedTemplate?.layoutKey === "digival" &&
     DIGIVAL_HIDDEN_FIELDS.includes(field.key)
   );
+};
+
+const isDigiValPhotoField = field => {
+  return selectedTemplate?.layoutKey === "digival" && field.key === "photo";
 };
 
 const getPreparedFormData = () => {
@@ -47,7 +58,7 @@ const getPreparedFormData = () => {
 
   const preparedData = { ...formData };
 
-  selectedTemplate.fields.forEach(field => {
+  selectedTemplate.fields?.forEach(field => {
     if (["address", "website"].includes(field.key)) {
       preparedData[field.key] = field.defaultValue || "";
     }
@@ -95,24 +106,6 @@ const getFinalQrData = () => {
           return;
         }
 
-        if (draftId) {
-          const draftCard = getLocalGeneratedCardById(draftId);
-
-          if (draftCard) {
-            const draftTemplateId =
-              draftCard.templateId?._id ||
-              draftCard.templateSnapshot?._id ||
-              draftCard.templateId;
-
-            setEditingDraftId(draftCard.localId);
-            setSelectedTemplateId(draftTemplateId);
-            setFormData(draftCard.formData || {});
-            setQrData(draftCard.qrData || "");
-
-            return;
-          }
-        }
-
         const firstTemplateId = templateId || templatesResponse.data[0]?._id || "";
         setSelectedTemplateId(firstTemplateId);
       } catch (error) {
@@ -123,7 +116,7 @@ const getFinalQrData = () => {
     };
 
     fetchInitialData();
-  }, [templateId, draftId, cardId]);
+  }, [templateId, cardId]);
 
   useEffect(() => {
     const fetchSelectedTemplate = async () => {
@@ -133,7 +126,7 @@ const getFinalQrData = () => {
         const response = await templateAPI.getById(selectedTemplateId);
         setSelectedTemplate(response.data);
 
-        if (!draftId && !cardId) {
+        if (!cardId) {
           const emptyData = buildEmptyFormData(response.data.fields || []);
           setFormData(emptyData);
           setQrData(
@@ -146,14 +139,14 @@ const getFinalQrData = () => {
     };
 
     fetchSelectedTemplate();
-  }, [selectedTemplateId, draftId, cardId]);
+  }, [selectedTemplateId, cardId]);
 
   const handleTemplateChange = newTemplateId => {
     setSelectedTemplateId(newTemplateId);
-    setEditingDraftId("");
     setEditingSavedCardId("");
     setFormData({});
     setQrData("");
+    navigate(`/generate/${newTemplateId}`, { replace: true });
   };
 
   const updateValue = (key, value) => {
@@ -179,15 +172,19 @@ const getFinalQrData = () => {
     return;
   }
 
-  if (selectedTemplate?.layoutKey === "digival" && fieldKey === "photo") {
-    if (file.type !== "image/png") {
-      alert("Please upload a PNG image for DigiVal ID card photo.");
-      return;
-    }
-  }
-
   try {
     const response = await uploadAPI.image(file);
+
+    if (selectedTemplate?.layoutKey === "digival" && fieldKey === "photo") {
+      setFormData(previousData => ({
+        ...DIGIVAL_PHOTO_DEFAULTS,
+        ...previousData,
+        photo: response.data.imageUrl
+      }));
+      setQrData("STATIC_DIGIVAL_QR");
+      return;
+    }
+
     updateValue(fieldKey, response.data.imageUrl);
   } catch (error) {
     alert(error.response?.data?.message || "Image upload failed");
@@ -222,31 +219,6 @@ const getFinalQrData = () => {
 
  
 
-  const addToGeneratedCards = () => {
-    if (!validateForm()) return;
-
-    const generatedCard = upsertLocalGeneratedCard({
-      localId: editingDraftId || "",
-      templateId: {
-        _id: selectedTemplate._id,
-        templateName: selectedTemplate.templateName,
-        category: selectedTemplate.category,
-        orientation: selectedTemplate.orientation,
-        layoutKey: selectedTemplate.layoutKey,
-        slug: selectedTemplate.slug
-      },
-      templateSnapshot: selectedTemplate,
-      formData: getPreparedFormData(),
-      photo: formData.photo || "",
-      logo: formData.logo || "",
-      qrData: getFinalQrData()
-    });
-
-    setEditingDraftId(generatedCard.localId);
-
-    alert("Card added to Generated Cards section");
-  };
-
   const saveCard = async () => {
     if (!validateForm()) return;
 
@@ -264,10 +236,14 @@ const getFinalQrData = () => {
 
       if (editingSavedCardId) {
         await cardAPI.update(editingSavedCardId, payload);
-        alert("Saved card updated successfully");
+        alert("Card updated successfully");
       } else {
-        await cardAPI.create(payload);
-        alert("Card saved to database successfully");
+        const response = await cardAPI.create(payload);
+        setEditingSavedCardId(response.data._id);
+        navigate(`/generate/${selectedTemplate._id}?cardId=${response.data._id}`, {
+          replace: true
+        });
+        alert("Card saved successfully");
       }
     } catch (error) {
       alert(error.response?.data?.message || "Failed to save card");
@@ -292,21 +268,15 @@ const getFinalQrData = () => {
           <h1>
             {editingSavedCardId
               ? "Edit saved ID card"
-              : editingDraftId
-                ? "Edit generated ID card"
-                : "Fill details and generate your ID card"}
+              : "Fill details and generate your ID card"}
           </h1>
           <p>
-            Add card to Generated Cards section first, then save to database only
-            when needed.
+            Save once to store the card in the project database, then manage it
+            from Generated Cards.
           </p>
         </div>
 
         <div className="button-row">
-          <button className="btn secondary" onClick={addToGeneratedCards}>
-            Add to Generated Cards
-          </button>
-
           <button
             className="btn primary"
             onClick={saveCard}
@@ -315,8 +285,8 @@ const getFinalQrData = () => {
             {saving
               ? "Saving..."
               : editingSavedCardId
-                ? "Update Saved Card"
-                : "Save to Database"}
+                ? "Update Card"
+                : "Save Card"}
           </button>
 
           <Link className="btn dark" to="/cards">
@@ -360,8 +330,8 @@ const getFinalQrData = () => {
    <input
   type="file"
   accept={
-    selectedTemplate?.layoutKey === "digival" && field.key === "photo"
-      ? "image/png"
+    isDigiValPhotoField(field)
+      ? "image/png,image/jpeg,image/jpg,image/webp"
       : "image/*"
   }
   onChange={event =>
@@ -369,7 +339,35 @@ const getFinalQrData = () => {
   }
 />
 
-    
+    {isDigiValPhotoField(field) && (
+      <>
+        <span className="helper-text">
+          Upload a straight-facing portrait. PNG with transparent background is
+          best, but JPG and WEBP are accepted.
+        </span>
+
+        <div className="photo-adjust-grid">
+          {DIGIVAL_PHOTO_ADJUST_FIELDS.map(setting => (
+            <label key={setting.key}>
+              {setting.label}
+              <input
+                type="number"
+                min={setting.min}
+                max={setting.max}
+                step="1"
+                value={
+                  formData[setting.key] ??
+                  DIGIVAL_PHOTO_DEFAULTS[setting.key]
+                }
+                onChange={event =>
+                  updateValue(setting.key, event.target.value)
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </>
+    )}
   </>
 ) : field.type === "textarea" ? (
                     <textarea

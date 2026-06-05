@@ -10,7 +10,7 @@ A professional MERN Stack ID Card Generator for office, university, event, and i
 - Front and back card preview
 - Photo/logo upload
 - QR code support
-- Save generated cards in MongoDB
+- Single save action for generated cards in MongoDB
 - Export as PNG
 - Export as PDF
 - Print cards
@@ -65,7 +65,7 @@ npm run dev
 Frontend URL:
 
 ```txt
-http://localhost:5173
+http://localhost:5175
 ```
 
 ## Folder Structure

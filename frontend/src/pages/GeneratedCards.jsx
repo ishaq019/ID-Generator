@@ -3,10 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { cardAPI } from "../services/api";
 import CardPreview from "../components/CardPreview";
 import ExportButtons from "../components/ExportButtons";
-import {
-  deleteLocalGeneratedCard,
-  getLocalGeneratedCards
-} from "../utils/localGeneratedCards";
 
 function getTemplateId(card) {
   return (
@@ -28,8 +24,7 @@ function GeneratedCards() {
   const [searchParams] = useSearchParams();
   const templateFilterId = searchParams.get("templateId");
 
-  const [savedCards, setSavedCards] = useState([]);
-  const [localCards, setLocalCards] = useState([]);
+  const [cards, setCards] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -37,19 +32,8 @@ function GeneratedCards() {
     try {
       const response = await cardAPI.getAll();
 
-      const databaseCards = response.data.map(card => ({
-        ...card,
-        isLocal: false,
-        isSaved: true
-      }));
-
-      const unsavedCards = getLocalGeneratedCards();
-
-      setSavedCards(databaseCards);
-      setLocalCards(unsavedCards);
-
-      const allCards = [...unsavedCards, ...databaseCards];
-      setSelectedCard(allCards[0] || null);
+      setCards(response.data);
+      setSelectedCard(response.data[0] || null);
     } catch (error) {
       alert(error.response?.data?.message || "Failed to load saved cards");
     }
@@ -59,23 +43,11 @@ function GeneratedCards() {
     fetchCards();
   }, []);
 
-  const allCards = useMemo(() => {
-    return [...localCards, ...savedCards];
-  }, [localCards, savedCards]);
-
   const filteredCards = useMemo(() => {
-    let result = allCards;
+    let result = cards;
 
     if (templateFilterId) {
       result = result.filter(card => getTemplateId(card) === templateFilterId);
-    }
-
-    if (activeFilter === "unsaved") {
-      result = result.filter(card => card.isLocal);
-    }
-
-    if (activeFilter === "saved") {
-      result = result.filter(card => card.isSaved);
     }
 
     if (activeFilter === "digival") {
@@ -83,7 +55,18 @@ function GeneratedCards() {
     }
 
     return result;
-  }, [allCards, activeFilter, templateFilterId]);
+  }, [cards, activeFilter, templateFilterId]);
+
+  useEffect(() => {
+    if (
+      selectedCard &&
+      filteredCards.some(card => card._id === selectedCard._id)
+    ) {
+      return;
+    }
+
+    setSelectedCard(filteredCards[0] || null);
+  }, [filteredCards, selectedCard]);
 
   const handleDelete = async card => {
     const confirmDelete = window.confirm("Delete this generated card?");
@@ -91,16 +74,8 @@ function GeneratedCards() {
     if (!confirmDelete) return;
 
     try {
-      if (card.isLocal) {
-        const updatedLocalCards = deleteLocalGeneratedCard(card.localId);
-        setLocalCards(updatedLocalCards);
-
-        const nextCards = [...updatedLocalCards, ...savedCards];
-        setSelectedCard(nextCards[0] || null);
-      } else {
-        await cardAPI.delete(card._id);
-        await fetchCards();
-      }
+      await cardAPI.delete(card._id);
+      await fetchCards();
     } catch (error) {
       alert(error.response?.data?.message || "Failed to delete card");
     }
@@ -108,10 +83,6 @@ function GeneratedCards() {
 
   const getEditLink = card => {
     const templateId = getTemplateId(card);
-
-    if (card.isLocal) {
-      return `/generate/${templateId}?draftId=${card.localId}`;
-    }
 
     return `/generate/${templateId}?cardId=${card._id}`;
   };
@@ -121,11 +92,8 @@ function GeneratedCards() {
       <div className="page-header">
         <div>
           <span className="eyebrow">Generated Cards</span>
-          <h1>View all generated ID cards</h1>
-          <p>
-            This section shows both unsaved generated cards and saved MongoDB
-            cards.
-          </p>
+          <h1>View saved ID cards</h1>
+          <p>Every card shown here is saved in the project database.</p>
         </div>
 
         <Link className="btn primary" to="/templates">
@@ -138,28 +106,14 @@ function GeneratedCards() {
           className={activeFilter === "all" ? "chip active" : "chip"}
           onClick={() => setActiveFilter("all")}
         >
-          All ({allCards.length})
-        </button>
-
-        <button
-          className={activeFilter === "unsaved" ? "chip active" : "chip"}
-          onClick={() => setActiveFilter("unsaved")}
-        >
-          Unsaved Generated ({localCards.length})
-        </button>
-
-        <button
-          className={activeFilter === "saved" ? "chip active" : "chip"}
-          onClick={() => setActiveFilter("saved")}
-        >
-          Saved Database ({savedCards.length})
+          All ({cards.length})
         </button>
 
         <button
           className={activeFilter === "digival" ? "chip active" : "chip"}
           onClick={() => setActiveFilter("digival")}
         >
-          DigiVal Cards ({allCards.filter(isDigiValCard).length})
+          DigiVal Cards ({cards.filter(isDigiValCard).length})
         </button>
       </div>
 
@@ -194,12 +148,7 @@ function GeneratedCards() {
                 <span>{new Date(card.createdAt).toLocaleDateString()}</span>
 
                 <div className="card-status-row">
-                  {card.isLocal ? (
-                    <div className="mini-badge warning">Unsaved</div>
-                  ) : (
-                    <div className="mini-badge success">Saved</div>
-                  )}
-
+                  <div className="mini-badge success">Saved</div>
                   {isDigiValCard(card) && (
                     <div className="mini-badge">DigiVal</div>
                   )}

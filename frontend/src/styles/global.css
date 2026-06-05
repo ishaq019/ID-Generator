@@ -1,6 +1,6 @@
 
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
 
 
 * {
@@ -509,19 +509,93 @@ textarea:focus {
   width: auto;
 }
 
-.preview-wrap {
-  display: flex;
-  gap: 32px;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  overflow-x: auto;
+.preview-viewer {
+  display: grid;
+  gap: 14px;
+}
+
+.preview-toolbar {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 10px;
+  align-items: center;
+}
+
+.preview-arrow {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: 0.2s ease;
+}
+
+.preview-arrow:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.14);
+  transform: translateY(-1px);
+}
+
+.preview-side-tabs {
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #f8fafc;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.preview-side-tabs button {
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.preview-side-tabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .preview-label {
   font-weight: 900;
   color: #475569;
-  font-size: 16px;
-  margin-bottom: 14px;
+  font-size: 15px;
+  margin: 0;
+}
+
+.preview-card-stage {
+  width: 100%;
+  min-height: 704px;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.export-stage {
+  position: fixed;
+  left: -12000px;
+  top: 0;
+  width: max-content;
+  height: max-content;
+  pointer-events: none;
 }
 
 .id-card-preview {
@@ -601,6 +675,10 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .photo-adjust-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .page-header {
     flex-direction: column;
   }
@@ -624,6 +702,12 @@ textarea:focus {
     margin: 20px;
   }
 
+  .export-stage {
+    position: static !important;
+    width: auto;
+    height: auto;
+  }
+
   .navbar,
   .btn,
   .page-header,
@@ -633,11 +717,11 @@ textarea:focus {
 }
 .digival-card {
   width: 420px;
-  height: 680px;
+  height: 679px;
   position: relative;
   overflow: hidden;
   background: #ffffff;
-  border-radius: 26px;
+  border-radius: 28px;
   border: 3px solid #111111;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
   font-family: "Poppins", Arial, sans-serif;
@@ -646,7 +730,7 @@ textarea:focus {
 
 .digival-logo-position {
   position: absolute;
-  top: 42px;
+  top: 39px;
   left: 0;
   right: 0;
   display: flex;
@@ -654,12 +738,8 @@ textarea:focus {
 }
 
 .digival-logo-image {
-  padding: 6px 20;
-  padding-left: 20px;
-  padding-right: 20px;
-  
-  width: 180px;
-  height:auto;
+  width: 160px;
+  height: auto;
   object-fit: contain;
   display: block;
 }
@@ -667,71 +747,62 @@ textarea:focus {
 .digival-photo-wrap {
   position: absolute;
   left: 62px;
-  top: 175px;
+  top: 138px;
   width: 300px;
-  height: 380px;
+  height: 346px;
   overflow: visible;
   z-index: 1;
 }
 
-/* Main D shape container */
 .digival-photo-shape {
   position: absolute;
   left: 0;
-  top: 38px;
+  top: 62px;
   width: 300px;
-  height: 300px;
-  border-radius: 24px 190px 190px 24px;
+  height: 284px;
+  border-radius: 16px 165px 165px 16px;
   overflow: hidden;
   z-index: 1;
 }
 
-/* Blue D background */
 .digival-photo-bg {
   position: absolute;
   inset: 0;
-  background: #1fa5ff;
+  background: #12a8f4;
   border-radius: inherit;
   z-index: 1;
 }
 
-/* Body layer: clipped inside D shape */
-.digival-employee-photo-body {
+.digival-employee-photo {
   position: absolute;
   left: 0;
-  top: -85px;
   width: 300px;
-  height: 360px;
+  height: 346px;
   object-fit: contain;
   object-position: center bottom;
   display: block;
+}
+
+.digival-employee-photo-body {
+  top: -62px;
   z-index: 2;
 }
 
-/* Head overflow area only */
-.digival-head-overflow {
-  position: absolute;
-  left: 0;
-top: -50px;
-height: 110px;
-width: 200px;
-  overflow: hidden;
-  z-index: 3;
-}
-
-/* Same photo, but only top part is visible */
-.digival-employee-photo-head {
+.digival-photo-overflow {
   position: absolute;
   left: 0;
   top: 0;
   width: 300px;
-  height: 360px;
-  object-fit: contain;
-  object-position: center bottom;
-  display: block;
+  height: 62px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
 }
 
-/* Placeholder when no photo uploaded */
+.digival-employee-photo-top {
+  top: 0;
+}
+
 .digival-photo-placeholder {
   position: absolute;
   inset: 0;
@@ -745,32 +816,32 @@ width: 200px;
 
 .digival-name {
   position: absolute;
-  left: 62px;
-  top: 540px;
-  width: 300px;
+  left: 44px;
+  top: 522px;
+  width: 340px;
   color: #2196f3;
-  font-size: 22px;
+  font-size: 22.5px;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 .digival-employee-id {
   position: absolute;
-  left: 62px;
-  top: 580px;
+  left: 44px;
+  top: 562px;
   width: 180px;
   color: #111111;
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
 }
 
 .digival-qr-box {
   position: absolute;
-  left: 110px;
-  top: 160px;
-  width: 200px;
-  height: 200px;
+  left: 91px;
+  top: 148px;
+  width: 252px;
+  height: 232px;
   display: grid;
   place-items: center;
 }
@@ -778,47 +849,47 @@ width: 200px;
 
 .digival-blood {
   position: absolute;
-  left: 62px;
-  top: 380px;
-  width: 280px;
+  left: 44px;
+  top: 390px;
+  width: 330px;
   color: #111111;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20.5px;
+  font-weight: 800;
   line-height: 1.25;
 }
 
 .digival-address-title {
   position: absolute;
-  left: 62px;
-  top: 430px;
-  width: 260px;
+  left: 44px;
+  top: 426px;
+  width: 320px;
   color: #2196f3;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
 }
 
 .digival-address {
   position: absolute;
-  left: 62px;
-  top: 460px;
-  width: 290px;
+  left: 44px;
+  top: 459px;
+  width: 340px;
   min-height: 100px;
   color: #111111;
-  font-size: 12.5px;
-  font-weight: 700;
-  line-height: 1.65;
+  font-size: 15.5px;
+  font-weight: 800;
+  line-height: 1.64;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .digival-phone {
   position: absolute;
-  left: 62px;
-  top: 530px;
-  width: 250px;
+  left: 44px;
+  top: 538px;
+  width: 300px;
   color: #111111;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 15.5px;
+  font-weight: 800;
   line-height: 1.3;
 }
 
@@ -826,11 +897,11 @@ width: 200px;
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 26px;
+  bottom: 31px;
   text-align: center;
   color: #2196f3;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 22.5px;
+  font-weight: 800;
   line-height: 1.1;
 }
 input::placeholder,
@@ -847,8 +918,8 @@ textarea:focus::placeholder {
 
 
 .digival-static-qr {
-  width: auto;
-  height: 200px;
+  width: 252px;
+  height: auto;
   object-fit: contain;
   display: block;
 }
@@ -895,11 +966,6 @@ textarea:focus::placeholder {
   font-weight: 800;
 }
 
-.mini-badge.warning {
-  background: #fef3c7;
-  color: #b45309;
-}
-
 .mini-badge.success {
   background: #dcfce7;
   color: #15803d;
@@ -925,4 +991,25 @@ textarea:focus::placeholder {
   font-size: 12px;
   font-weight: 700;
   margin-top: 4px;
+}
+
+.photo-adjust-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.photo-adjust-grid label {
+  margin: 0;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.photo-adjust-grid input {
+  padding: 9px 10px;
+  border-radius: 10px;
 }

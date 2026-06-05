@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 
 function getCardBackground(design = {}) {
@@ -33,7 +34,7 @@ const digivalQrLogo = buildDigivalQrLogo();
 function DigivalLogo() {
   return (
     <img
-      src="../../public/digival/digival-logo.png"
+      src="/digival/digival-logo.png"
       alt="DigiVal Logo"
       className="digival-logo-image"
     />
@@ -42,20 +43,22 @@ function DigivalLogo() {
 
 function DotCluster({ left = 28, top = 20 }) {
   const dots = [];
+  const dotSize = 3.4;
+  const dotGap = 18.9;
 
-  for (let row = 0; row < 5; row += 1) {
+  for (let row = 0; row < 6; row += 1) {
     for (let col = 0; col < 5; col += 1) {
       dots.push(
         <span
           key={`${row}-${col}`}
           style={{
             position: "absolute",
-            width: 4,
-            height: 4,
+            width: dotSize,
+            height: dotSize,
             borderRadius: "50%",
-            background: "#63aef6",
-            left: col * 22,
-            top: row * 22
+            background: "#2f9be8",
+            left: col * dotGap,
+            top: row * dotGap
           }}
         />
       );
@@ -68,8 +71,8 @@ function DotCluster({ left = 28, top = 20 }) {
         position: "absolute",
         left,
         top,
-        width: 92,
-        height: 92
+        width: dotGap * 4 + dotSize,
+        height: dotGap * 5 + dotSize
       }}
     >
       {dots}
@@ -85,46 +88,70 @@ function getFieldValue(formData, template, key, fallback = "") {
   return formData?.[key] || findField(template, key)?.defaultValue || fallback;
 }
 
+function getNumberValue(formData, key, fallback) {
+  const value = Number(formData?.[key]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 function DigivalFront({ template, formData }) {
   const photo = getFieldValue(formData, template, "photo", "");
   const name = getFieldValue(formData, template, "name", "");
   const employeeId = getFieldValue(formData, template, "employeeId", "");
+  const photoX = getNumberValue(formData, "photoX", 0);
+  const photoY = getNumberValue(formData, "photoY", 0);
+  const photoWidth = getNumberValue(formData, "photoWidth", 300);
+  const photoHeight = getNumberValue(formData, "photoHeight", 346);
+  const photoBaseStyle = {
+    left: `${photoX}px`,
+    width: `${photoWidth}px`,
+    height: `${photoHeight}px`
+  };
+  const photoBodyStyle = {
+    ...photoBaseStyle,
+    top: `${photoY - 62}px`
+  };
+  const photoOverflowStyle = {
+    ...photoBaseStyle,
+    top: `${photoY}px`
+  };
 
   return (
     <div className="id-card-preview digival-card">
-      <DotCluster left={28} top={20} />
-      <DotCluster left={300} top={20} />
+      <DotCluster left={25} top={22} />
+      <DotCluster left={318} top={22} />
 
       <div className="digival-logo-position">
         <DigivalLogo />
       </div>
-<div className="digival-photo-wrap">
-  <div className="digival-photo-shape">
-    <div className="digival-photo-bg" />
+      <div className="digival-photo-wrap">
+        <div className="digival-photo-shape">
+          <div className="digival-photo-bg" />
 
-    {photo ? (
-      <img
-        src={photo}
-        alt="Employee Body"
-        className="digival-employee-photo-body"
-      />
-    ) : (
-      <div className="digival-photo-placeholder">
-        Photo
+          {photo ? (
+            <img
+              src={photo}
+              alt="Employee"
+              className="digival-employee-photo digival-employee-photo-body"
+              style={photoBodyStyle}
+            />
+          ) : (
+            <div className="digival-photo-placeholder">
+              Photo
+            </div>
+          )}
+        </div>
+
+        {photo && (
+          <div className="digival-photo-overflow" aria-hidden="true">
+            <img
+              src={photo}
+              alt=""
+              className="digival-employee-photo digival-employee-photo-top"
+              style={photoOverflowStyle}
+            />
+          </div>
+        )}
       </div>
-    )}
-  </div>
-
-  {photo && (
-    <div className="digival-head-overflow">
-      <img
-        src={photo}
-        alt="Employee Head"
-        className="digival-employee-photo-head"
-      />
-    </div>
-  )}
-</div>
       <div className="digival-name">{name}</div>
       <div className="digival-employee-id">{employeeId}</div>
     </div>
@@ -136,8 +163,8 @@ function DigivalBack({ template, formData }) {
 
   return (
     <div className="id-card-preview digival-card">
-      <DotCluster left={28} top={20} />
-      <DotCluster left={300} top={20} />
+      <DotCluster left={25} top={22} />
+      <DotCluster left={318} top={22} />
 
       <div className="digival-logo-position">
         <DigivalLogo />
@@ -301,14 +328,74 @@ function CardSide({ template, side, formData, qrData }) {
 }
 
 function CardPreview({ template, formData = {}, qrData = "" }) {
+  const [activeSide, setActiveSide] = useState("front");
+
   if (!template) {
     return <div className="empty-box">Select a template to preview</div>;
   }
 
+  const activeLabel = activeSide === "front" ? "Front Side" : "Back Side";
+  const showFront = () => setActiveSide("front");
+  const showBack = () => setActiveSide("back");
+  const showPrevious = () => {
+    setActiveSide(currentSide => (currentSide === "front" ? "back" : "front"));
+  };
+  const showNext = showPrevious;
+
   return (
-    <div className="preview-wrap">
-      <div>
-        <p className="preview-label">Front Side</p>
+    <>
+      <div className="preview-viewer">
+        <div className="preview-toolbar">
+          <button
+            type="button"
+            className="preview-arrow"
+            onClick={showPrevious}
+            aria-label="Show previous card side"
+          >
+            ‹
+          </button>
+
+          <div className="preview-side-tabs" aria-label="Preview side">
+            <button
+              type="button"
+              className={activeSide === "front" ? "active" : ""}
+              onClick={showFront}
+            >
+              Front
+            </button>
+
+            <button
+              type="button"
+              className={activeSide === "back" ? "active" : ""}
+              onClick={showBack}
+            >
+              Back
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="preview-arrow"
+            onClick={showNext}
+            aria-label="Show next card side"
+          >
+            ›
+          </button>
+        </div>
+
+        <p className="preview-label">{activeLabel}</p>
+
+        <div className="preview-card-stage">
+          <CardSide
+            template={template}
+            side={activeSide}
+            formData={formData}
+            qrData={qrData}
+          />
+        </div>
+      </div>
+
+      <div className="export-stage" aria-hidden="true">
         <div id="front-card-export">
           <CardSide
             template={template}
@@ -317,10 +404,7 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
             qrData={qrData}
           />
         </div>
-      </div>
 
-      <div>
-        <p className="preview-label">Back Side</p>
         <div id="back-card-export">
           <CardSide
             template={template}
@@ -330,7 +414,7 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
           />
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

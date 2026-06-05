@@ -10,8 +10,8 @@ const defaultTemplates = [
   isDefault: true,
 
   cardSize: {
-    width: 260,
-    height: 420,
+    width: 420,
+    height: 679,
     unit: "px"
   },
 
@@ -121,7 +121,7 @@ const defaultTemplates = [
       type: "textarea",
       side: "back",
       defaultValue:
-        "5th Floor Right Wing, Chennai Citi Centre,\nDr Radhakrishnan Salai, Mylapore,\nChennai - 600004, Tamil Nadu, India",
+        "5th Floor Right Wing, Chennai Citi Centre,\nDr Radhakrishnan Sulai, Mylapore,\nChennai - 600004, Tamil Nadu, India",
       x: 26,
       y: 314,
       width: 198,
@@ -335,4 +335,3 @@ const seedDefaultTemplates = async () => {
 };
 
 module.exports = seedDefaultTemplates;
-
