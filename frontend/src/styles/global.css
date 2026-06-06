@@ -758,9 +758,9 @@ textarea:focus {
   position: absolute;
   left: 0;
   top: 62px;
-  width: 300px;
+  width: 270px;
   height: 284px;
-  border-radius: 16px 165px 165px 16px;
+  border-radius: 18px 60% 60% 18px;
   overflow: hidden;
   z-index: 1;
 }
@@ -792,8 +792,8 @@ textarea:focus {
   position: absolute;
   left: 0;
   top: 0;
-  width: 300px;
-  height: 62px;
+  width: 270px;
+  height: 125px;
   overflow: hidden;
   pointer-events: none;
   z-index: 3;
@@ -819,9 +819,9 @@ textarea:focus {
   left: 44px;
   top: 522px;
   width: 340px;
-  color: #2196f3;
+  color: #12a8e8;
   font-size: 22.5px;
-  font-weight: 700;
+  font-weight: 620;
   line-height: 1.12;
 }
 
@@ -830,9 +830,9 @@ textarea:focus {
   left: 44px;
   top: 562px;
   width: 180px;
-  color: #111111;
+  color: #000000;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 604;
   line-height: 1;
 }
 
@@ -852,9 +852,9 @@ textarea:focus {
   left: 44px;
   top: 390px;
   width: 330px;
-  color: #111111;
-  font-size: 20.5px;
-  font-weight: 800;
+  color: #000000;
+  font-size: 21px;
+  font-weight: 630;
   line-height: 1.25;
 }
 
@@ -863,9 +863,9 @@ textarea:focus {
   left: 44px;
   top: 426px;
   width: 320px;
-  color: #2196f3;
-  font-size: 22px;
-  font-weight: 800;
+  color: #188abb;
+  font-size: 21.5px;
+  font-weight: 605;
 }
 
 .digival-address {
@@ -874,10 +874,10 @@ textarea:focus {
   top: 459px;
   width: 340px;
   min-height: 100px;
-  color: #111111;
-  font-size: 15.5px;
-  font-weight: 800;
-  line-height: 1.64;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -887,9 +887,9 @@ textarea:focus {
   left: 44px;
   top: 538px;
   width: 300px;
-  color: #111111;
-  font-size: 15.5px;
-  font-weight: 800;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 650;
   line-height: 1.3;
 }
 
@@ -899,9 +899,9 @@ textarea:focus {
   right: 0;
   bottom: 31px;
   text-align: center;
-  color: #2196f3;
+  color: #12a8e8;
   font-size: 22.5px;
-  font-weight: 800;
+  font-weight: 605;
   line-height: 1.1;
 }
 input::placeholder,
@@ -918,7 +918,7 @@ textarea:focus::placeholder {
 
 
 .digival-static-qr {
-  width: 252px;
+  width: 235px;
   height: auto;
   object-fit: contain;
   display: block;

@@ -9,7 +9,7 @@ const templateRoutes = require("./routes/templateRoutes");
 const cardRoutes = require("./routes/cardRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
-
+const googleFormRoutes = require("./routes/googleFormRoutes");
 dotenv.config();
 
 const app = express();
@@ -21,7 +21,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -32,16 +32,31 @@ app.get("/", (req, res) => {
 app.use("/api/templates", templateRoutes);
 app.use("/api/cards", cardRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/google-form", googleFormRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(async () => {
-  await seedDefaultTemplates();
+let isServerReady = false;
 
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+const prepareServer = async () => {
+  if (!isServerReady) {
+    await connectDB();
+    await seedDefaultTemplates();
+    isServerReady = true;
+  }
+};
+
+prepareServer();
+
+if (!process.env.VERCEL) {
+  prepareServer().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   });
-});
+}
+
+module.exports = app;
