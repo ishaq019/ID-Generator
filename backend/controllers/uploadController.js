@@ -3,10 +3,12 @@ exports.uploadImage = (req, res) => {
     return res.status(400).json({ message: "Image file is required" });
   }
 
-  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+  const base64Image = req.file.buffer.toString("base64");
+
+  const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
   res.status(201).json({
-    message: "Image uploaded successfully",
+    message: "Image converted to Base64 successfully",
     imageUrl
   });
 };

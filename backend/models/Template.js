@@ -90,4 +90,6 @@ category: {
 
 templateSchema.index({ templateName: "text", category: "text" });
 
-module.exports = mongoose.model("Template", templateSchema);
+module.exports =
+  mongoose.models.Template ||
+  mongoose.model("Template", templateSchema);

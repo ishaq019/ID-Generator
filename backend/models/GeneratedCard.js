@@ -19,8 +19,17 @@ const generatedCardSchema = new mongoose.Schema(
 
     generatedFrontImage: { type: String, default: "" },
     generatedBackImage: { type: String, default: "" },
+    generatedFrontFileUrl: { type: String, default: "" },
+    generatedBackFileUrl: { type: String, default: "" },
 
     recipientEmail: { type: String, default: "" },
+    emailStatus: {
+      type: String,
+      enum: ["not-required", "pending", "sent", "failed"],
+      default: "not-required"
+    },
+    emailSentAt: { type: Date },
+    emailError: { type: String, default: "" },
 
     source: {
       type: String,
@@ -33,6 +42,7 @@ const generatedCardSchema = new mongoose.Schema(
       default: "",
       index: true
     },
+    uploadsPersisted: { type: Boolean, default: false },
 
     templateSnapshot: {
       type: mongoose.Schema.Types.Mixed,
@@ -42,4 +52,6 @@ const generatedCardSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("GeneratedCard", generatedCardSchema);
+module.exports =
+  mongoose.models.GeneratedCard ||
+  mongoose.model("GeneratedCard", generatedCardSchema);

@@ -1,12 +1,23 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const sharp = require("sharp");
 
-const uploadDir = path.join(__dirname, "../uploads");
+const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "../uploads");
 const assetDir = path.join(__dirname, "../assets/digival");
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+]);
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (error) {
+  // Serverless runtimes can expose the project directory as read-only.
 }
 
 const escapeXml = value => {
@@ -18,19 +29,80 @@ const escapeXml = value => {
     .replaceAll("'", "&apos;");
 };
 
-const saveBase64Image = ({ base64, mimeType, employeeId }) => {
-  const extension = mimeType.includes("png") ? "png" : "jpg";
-  const safeEmployeeId = String(employeeId || "employee").replace(/[^a-zA-Z0-9_-]/g, "");
-  const fileName = `google-form-photo-${safeEmployeeId}-${Date.now()}.${extension}`;
-  const filePath = path.join(uploadDir, fileName);
+const normalizeMimeType = mimeType => {
+  const normalized = String(mimeType || "image/png").toLowerCase().trim();
+  return normalized === "image/jpg" ? "image/jpeg" : normalized;
+};
 
-  const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, "");
-  fs.writeFileSync(filePath, Buffer.from(cleanBase64, "base64"));
+const getExtension = mimeType => {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+};
+
+const getSafeEmployeeId = employeeId => {
+  return String(employeeId || "employee").replace(/[^a-zA-Z0-9_-]/g, "") || "employee";
+};
+
+const toDataUrl = (mimeType, buffer) => {
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
+};
+
+const writeImageFile = (fileName, buffer) => {
+  const uploadPath = path.join(uploadDir, fileName);
+
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    fs.writeFileSync(uploadPath, buffer);
+
+    return {
+      filePath: uploadPath,
+      imageUrl: `/uploads/${fileName}`,
+      persisted: true
+    };
+  } catch (error) {
+    const tempPath = path.join(os.tmpdir(), fileName);
+    fs.writeFileSync(tempPath, buffer);
+
+    return {
+      filePath: tempPath,
+      imageUrl: "",
+      persisted: false
+    };
+  }
+};
+
+const saveBase64Image = ({ base64, mimeType, employeeId }) => {
+  const rawBase64 = String(base64 || "").trim();
+  const dataUrlMatch = rawBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  const normalizedMimeType = normalizeMimeType(dataUrlMatch?.[1] || mimeType);
+
+  if (!SUPPORTED_MIME_TYPES.has(normalizedMimeType)) {
+    throw new Error("Photo must be a JPG, PNG, or WEBP image");
+  }
+
+  const cleanBase64 = dataUrlMatch ? dataUrlMatch[2] : rawBase64;
+  const imageBuffer = Buffer.from(cleanBase64, "base64");
+
+  if (!imageBuffer.length) {
+    throw new Error("Photo image data is empty");
+  }
+
+  if (imageBuffer.length > MAX_IMAGE_BYTES) {
+    throw new Error("Photo image is too large. Upload an image under 10 MB.");
+  }
+
+  const extension = getExtension(normalizedMimeType);
+  const safeEmployeeId = getSafeEmployeeId(employeeId);
+  const fileName = `google-form-photo-${safeEmployeeId}-${Date.now()}.${extension}`;
+  const savedFile = writeImageFile(fileName, imageBuffer);
 
   return {
     fileName,
-    filePath,
-    imageUrl: `/uploads/${fileName}`
+    ...savedFile,
+    buffer: imageBuffer,
+    mimeType: normalizedMimeType,
+    dataUrl: toDataUrl(normalizedMimeType, imageBuffer)
   };
 };
 
@@ -138,14 +210,11 @@ exports.generateDigivalCardImages = async ({
     employeeId
   });
 
-  const safeEmployeeId = String(employeeId || "employee").replace(/[^a-zA-Z0-9_-]/g, "");
+  const safeEmployeeId = getSafeEmployeeId(employeeId);
   const timestamp = Date.now();
 
   const frontFileName = `digival-front-${safeEmployeeId}-${timestamp}.png`;
   const backFileName = `digival-back-${safeEmployeeId}-${timestamp}.png`;
-
-  const frontPath = path.join(uploadDir, frontFileName);
-  const backPath = path.join(uploadDir, backFileName);
 
   const logoBuffer = await sharp(getAssetPath("digival-logo.png"))
     .resize({
@@ -165,7 +234,7 @@ exports.generateDigivalCardImages = async ({
     .png()
     .toBuffer();
 
-  const photoBuffer = await sharp(photo.filePath)
+  const photoBuffer = await sharp(photo.buffer)
     .rotate()
     .resize({
       width: 300,
@@ -180,7 +249,7 @@ exports.generateDigivalCardImages = async ({
     .png()
     .toBuffer();
 
-  await sharp(frontBase)
+  const frontBuffer = await sharp(frontBase)
     .composite([
       {
         input: logoBuffer,
@@ -194,13 +263,15 @@ exports.generateDigivalCardImages = async ({
       }
     ])
     .png()
-    .toFile(frontPath);
+    .toBuffer();
+
+  const frontFile = writeImageFile(frontFileName, frontBuffer);
 
   const backBase = await sharp(Buffer.from(createBackSvg({ bloodGroup, phone })))
     .png()
     .toBuffer();
 
-  await sharp(backBase)
+  const backBuffer = await sharp(backBase)
     .composite([
       {
         input: logoBuffer,
@@ -214,13 +285,22 @@ exports.generateDigivalCardImages = async ({
       }
     ])
     .png()
-    .toFile(backPath);
+    .toBuffer();
+
+  const backFile = writeImageFile(backFileName, backBuffer);
 
   return {
     photoUrl: photo.imageUrl,
-    frontPath,
-    backPath,
-    frontUrl: `/uploads/${frontFileName}`,
-    backUrl: `/uploads/${backFileName}`
+    photoDataUrl: photo.dataUrl,
+    photoPath: photo.filePath,
+    frontPath: frontFile.filePath,
+    backPath: backFile.filePath,
+    frontUrl: frontFile.imageUrl,
+    backUrl: backFile.imageUrl,
+    frontDataUrl: toDataUrl("image/png", frontBuffer),
+    backDataUrl: toDataUrl("image/png", backBuffer),
+    frontBuffer,
+    backBuffer,
+    persistedToUploads: photo.persisted && frontFile.persisted && backFile.persisted
   };
 };

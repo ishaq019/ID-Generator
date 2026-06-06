@@ -188,7 +188,7 @@ function DigivalBack({ template, formData }) {
 
       <div className="digival-address">
         5th Floor Right Wing, Chennai Citi Centre,
-        {"\n"}Dr Radhakrishnan Sulai, Mylapore,
+        {"\n"}Dr Radhakrishnan Salai, Mylapore,
         {"\n"}Chennai - 600004, Tamil Nadu, India
       </div>
 
@@ -352,7 +352,7 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
             onClick={showPrevious}
             aria-label="Show previous card side"
           >
-            ‹
+            {"<"}
           </button>
 
           <div className="preview-side-tabs" aria-label="Preview side">
@@ -379,7 +379,7 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
             onClick={showNext}
             aria-label="Show next card side"
           >
-            ›
+            {">"}
           </button>
         </div>
 
@@ -419,3 +419,4 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
 }
 
 export default CardPreview;
+
