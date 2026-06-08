@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 
+
+
+
+const publicAsset = path => {
+  return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
+};
+
 function getCardBackground(design = {}) {
   if (design.backgroundType === "gradient") return design.gradient;
   return design.backgroundColor || "#ffffff";
@@ -34,7 +41,7 @@ const digivalQrLogo = buildDigivalQrLogo();
 function DigivalLogo() {
   return (
     <img
-      src="/digival/digival-logo.png"
+      src={publicAsset("digival/digival-logo.png")}
       alt="DigiVal Logo"
       className="digival-logo-image"
     />
@@ -172,10 +179,10 @@ function DigivalBack({ template, formData }) {
 
       <div className="digival-qr-box">
         <img
-          src="/digival/digival-qr.png"
-          alt="DigiVal QR"
-          className="digival-static-qr"
-        />
+  src={publicAsset("digival/digival-qr.png")}
+  alt="DigiVal QR"
+  className="digival-static-qr"
+/>
       </div>
 
       <div className="digival-blood">

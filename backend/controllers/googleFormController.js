@@ -1,11 +1,11 @@
 const Template = require("../models/Template");
 const GeneratedCard = require("../models/GeneratedCard");
-const { generateDigivalCardImages } = require("../utils/digivalCardGenerator");
-const { sendIdCardEmail } = require("../utils/emailService");
+const { sendIdCardSubmissionEmail } = require("../utils/emailService");
 
 const getDigivalTemplateSlug = () => {
   return process.env.DIGIVAL_TEMPLATE_SLUG || "digival-employee-id-card";
 };
+
 const DIGIVAL_ADDRESS =
   "5th Floor Right Wing, Chennai Citi Centre,\nDr Radhakrishnan Salai, Mylapore,\nChennai - 600004, Tamil Nadu, India";
 
@@ -124,35 +124,14 @@ const normalizeGoogleFormPayload = body => {
   };
 };
 
-const dataUrlToBuffer = dataUrl => {
-  const match = String(dataUrl || "").match(/^data:image\/png;base64,(.+)$/);
+const buildImageDataUrl = ({ photoBase64, photoMimeType }) => {
+  if (!photoBase64) return "";
 
-  if (!match) return null;
-
-  return Buffer.from(match[1], "base64");
-};
-
-const sendEmailForExistingCard = async card => {
-  const frontBuffer = dataUrlToBuffer(card.generatedFrontImage);
-  const backBuffer = dataUrlToBuffer(card.generatedBackImage);
-
-  if (!frontBuffer || !backBuffer) {
-    throw new Error("Saved card images are not available for email retry");
+  if (String(photoBase64).startsWith("data:image")) {
+    return photoBase64;
   }
 
-  await sendIdCardEmail({
-    to: card.recipientEmail,
-    employeeName: card.formData?.name || "Employee",
-    frontBuffer,
-    backBuffer
-  });
-
-  card.emailStatus = "sent";
-  card.emailSentAt = new Date();
-  card.emailError = "";
-  await card.save();
-
-  return card;
+  return `data:${photoMimeType || "image/png"};base64,${photoBase64}`;
 };
 
 const getMissingFields = payload => {
@@ -166,6 +145,20 @@ const getMissingFields = payload => {
   ]
     .filter(([, value]) => !value)
     .map(([field]) => field);
+};
+
+const sendConfirmationForExistingCard = async card => {
+  await sendIdCardSubmissionEmail({
+    to: card.recipientEmail,
+    employeeName: card.formData?.name || "Employee"
+  });
+
+  card.emailStatus = "sent";
+  card.emailSentAt = new Date();
+  card.emailError = "";
+  await card.save();
+
+  return card;
 };
 
 exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
@@ -205,11 +198,11 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
     if (existingCard) {
       if (["pending", "failed"].includes(existingCard.emailStatus)) {
         try {
-          const emailedCard = await sendEmailForExistingCard(existingCard);
+          const emailedCard = await sendConfirmationForExistingCard(existingCard);
 
           return res.status(200).json({
             message:
-              "This Google Form submission was already saved; email was resent successfully",
+              "This Google Form submission was already saved; confirmation email was resent successfully",
             card: emailedCard
           });
         } catch (emailError) {
@@ -219,7 +212,7 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
 
           return res.status(502).json({
             message:
-              "This Google Form submission was already saved, but email retry failed",
+              "This Google Form submission was already saved, but confirmation email retry failed",
             error: emailError.message,
             card: existingCard
           });
@@ -242,11 +235,7 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       });
     }
 
-    const generatedImages = await generateDigivalCardImages({
-      name: payload.name,
-      employeeId: payload.employeeId,
-      bloodGroup: payload.bloodGroup,
-      phone: payload.phone,
+    const photoDataUrl = buildImageDataUrl({
       photoBase64: payload.photoBase64,
       photoMimeType: payload.photoMimeType
     });
@@ -259,34 +248,33 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       email: payload.email,
       address: DIGIVAL_ADDRESS,
       website: "www.digi-val.com",
-      photo: generatedImages.photoDataUrl || generatedImages.photoUrl
+      photo: photoDataUrl
     };
 
     const card = await GeneratedCard.create({
       templateId: template._id,
       formData,
-      photo: generatedImages.photoDataUrl || generatedImages.photoUrl,
+      photo: photoDataUrl,
       qrData: "STATIC_DIGIVAL_QR",
-      generatedFrontImage: generatedImages.frontDataUrl,
-      generatedBackImage: generatedImages.backDataUrl,
-      generatedFrontFileUrl: generatedImages.frontUrl,
-      generatedBackFileUrl: generatedImages.backUrl,
+
+      // No image attachment generation now.
+      generatedFrontImage: "",
+      generatedBackImage: "",
+      generatedFrontFileUrl: "",
+      generatedBackFileUrl: "",
+
       recipientEmail: payload.email,
       emailStatus: "pending",
       source: "google-form",
       googleSubmissionId: payload.submissionId || "",
-      uploadsPersisted: generatedImages.persistedToUploads,
+      uploadsPersisted: false,
       templateSnapshot: template.toObject()
     });
 
     try {
-      await sendIdCardEmail({
+      await sendIdCardSubmissionEmail({
         to: payload.email,
-        employeeName: payload.name,
-        frontPath: generatedImages.frontPath,
-        backPath: generatedImages.backPath,
-        frontBuffer: generatedImages.frontBuffer,
-        backBuffer: generatedImages.backBuffer
+        employeeName: payload.name
       });
 
       card.emailStatus = "sent";
@@ -299,14 +287,16 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       await card.save();
 
       return res.status(502).json({
-        message: "DigiVal ID card was generated and saved, but email sending failed",
+        message:
+          "Google Form data was saved and ID card is available on website, but confirmation email sending failed",
         error: emailError.message,
         card
       });
     }
 
     res.status(201).json({
-      message: "DigiVal ID card generated, saved, and emailed successfully",
+      message:
+        "Google Form data saved successfully. ID card is available on website and confirmation email sent.",
       card
     });
   } catch (error) {

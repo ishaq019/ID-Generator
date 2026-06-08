@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "MERN ID Card Generator Frontend",
   "type": "module",
+  "homepage": "https://syedishaq.me/ID-Generator",
+
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+     "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
