@@ -45,6 +45,7 @@ function DigivalLogo() {
       src={publicAsset("digival/digival-logo.png")}
       alt="DigiVal Logo"
       className="digival-logo-image"
+      crossOrigin="anonymous"
     />
   );
 }
@@ -142,6 +143,7 @@ function DigivalFront({ template, formData }) {
               alt="Employee"
               className="digival-employee-photo digival-employee-photo-body"
               style={photoBodyStyle}
+              crossOrigin="anonymous"
             />
           ) : (
             <div className="digival-photo-placeholder">
@@ -157,6 +159,7 @@ function DigivalFront({ template, formData }) {
               alt=""
               className="digival-employee-photo digival-employee-photo-top"
               style={photoOverflowStyle}
+              crossOrigin="anonymous"
             />
           </div>
         )}
@@ -184,6 +187,7 @@ function DigivalBack({ template, formData }) {
   src={publicAsset("digival/digival-qr.png")}
   alt="DigiVal QR"
   className="digival-static-qr"
+  crossOrigin="anonymous"
 />
       </div>
 
@@ -241,6 +245,7 @@ const value = formData?.[field.key] || "";
       <img
         src={resolveApiAssetUrl(value)}
         alt={field.label}
+        crossOrigin="anonymous"
         style={{
           ...commonStyle,
           objectFit: "cover",

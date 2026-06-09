@@ -1,6 +1,7 @@
 const Template = require("../models/Template");
 const GeneratedCard = require("../models/GeneratedCard");
 const { sendIdCardSubmissionEmail } = require("../utils/emailService");
+const { uploadBufferToDrive } = require("../utils/googleDriveStorage");
 
 const getDigivalTemplateSlug = () => {
   return process.env.DIGIVAL_TEMPLATE_SLUG || "digival-employee-id-card";
@@ -124,14 +125,56 @@ const normalizeGoogleFormPayload = body => {
   };
 };
 
-const buildImageDataUrl = ({ photoBase64, photoMimeType }) => {
-  if (!photoBase64) return "";
+const getPhotoExtension = mimeType => {
+  const extensions = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif"
+  };
 
-  if (String(photoBase64).startsWith("data:image")) {
-    return photoBase64;
+  return extensions[String(mimeType || "").toLowerCase()] || "png";
+};
+
+const buildGoogleFormPhotoFile = payload => {
+  let photoMimeType = payload.photoMimeType || "image/png";
+  let photoBase64 = String(payload.photoBase64 || "").trim();
+
+  const dataUrlMatch = photoBase64.match(/^data:(image\/[\w.+-]+);base64,(.+)$/is);
+
+  if (dataUrlMatch) {
+    photoMimeType = dataUrlMatch[1];
+    photoBase64 = dataUrlMatch[2];
   }
 
-  return `data:${photoMimeType || "image/png"};base64,${photoBase64}`;
+  if (!String(photoMimeType).toLowerCase().startsWith("image/")) {
+    const error = new Error("Google Form photo must be an image");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanBase64 = photoBase64.replace(/\s/g, "");
+  const buffer = Buffer.from(cleanBase64, "base64");
+
+  if (!buffer.length) {
+    const error = new Error("Google Form photo could not be decoded");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const safeEmployeeId = String(payload.employeeId || "employee")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const extension = getPhotoExtension(photoMimeType);
+
+  return {
+    fieldname: "photo",
+    originalname: `${safeEmployeeId || "employee"}-photo.${extension}`,
+    mimetype: photoMimeType,
+    size: buffer.length,
+    buffer
+  };
 };
 
 const getMissingFields = payload => {
@@ -235,10 +278,16 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       });
     }
 
-    const photoDataUrl = buildImageDataUrl({
-      photoBase64: payload.photoBase64,
-      photoMimeType: payload.photoMimeType
-    });
+    let uploadedPhoto;
+
+    try {
+      uploadedPhoto = await uploadBufferToDrive(buildGoogleFormPhotoFile(payload));
+    } catch (uploadError) {
+      return res.status(uploadError.statusCode || 502).json({
+        message: "Google Form photo could not be saved to Google Drive",
+        error: uploadError.message
+      });
+    }
 
     const formData = {
       name: payload.name,
@@ -248,13 +297,14 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       email: payload.email,
       address: DIGIVAL_ADDRESS,
       website: "www.digi-val.com",
-      photo: photoDataUrl
+      photo: uploadedPhoto.imageUrl,
+      photoDriveFileId: uploadedPhoto.fileId
     };
 
     const card = await GeneratedCard.create({
       templateId: template._id,
       formData,
-      photo: photoDataUrl,
+      photo: uploadedPhoto.imageUrl,
       qrData: "STATIC_DIGIVAL_QR",
 
       // No image attachment generation now.
@@ -267,7 +317,7 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       emailStatus: "pending",
       source: "google-form",
       googleSubmissionId: payload.submissionId || "",
-      uploadsPersisted: false,
+      uploadsPersisted: true,
       templateSnapshot: template.toObject()
     });
 

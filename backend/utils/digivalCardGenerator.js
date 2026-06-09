@@ -1,9 +1,8 @@
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const sharp = require("sharp");
+const { uploadBufferToDrive } = require("./googleDriveStorage");
 
-const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, "../uploads");
 const assetDir = path.join(__dirname, "../assets/digival");
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_MIME_TYPES = new Set([
@@ -44,35 +43,7 @@ const getSafeEmployeeId = employeeId => {
   return String(employeeId || "employee").replace(/[^a-zA-Z0-9_-]/g, "") || "employee";
 };
 
-const toDataUrl = (mimeType, buffer) => {
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-};
-
-const writeImageFile = (fileName, buffer) => {
-  const uploadPath = path.join(uploadDir, fileName);
-
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    fs.writeFileSync(uploadPath, buffer);
-
-    return {
-      filePath: uploadPath,
-      imageUrl: `/uploads/${fileName}`,
-      persisted: true
-    };
-  } catch (error) {
-    const tempPath = path.join(os.tmpdir(), fileName);
-    fs.writeFileSync(tempPath, buffer);
-
-    return {
-      filePath: tempPath,
-      imageUrl: "",
-      persisted: false
-    };
-  }
-};
-
-const saveBase64Image = ({ base64, mimeType, employeeId }) => {
+const decodeBase64Image = ({ base64, mimeType, employeeId }) => {
   const rawBase64 = String(base64 || "").trim();
   const dataUrlMatch = rawBase64.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   const normalizedMimeType = normalizeMimeType(dataUrlMatch?.[1] || mimeType);
@@ -95,15 +66,22 @@ const saveBase64Image = ({ base64, mimeType, employeeId }) => {
   const extension = getExtension(normalizedMimeType);
   const safeEmployeeId = getSafeEmployeeId(employeeId);
   const fileName = `google-form-photo-${safeEmployeeId}-${Date.now()}.${extension}`;
-  const savedFile = writeImageFile(fileName, imageBuffer);
 
   return {
     fileName,
-    ...savedFile,
     buffer: imageBuffer,
-    mimeType: normalizedMimeType,
-    dataUrl: toDataUrl(normalizedMimeType, imageBuffer)
+    mimeType: normalizedMimeType
   };
+};
+
+const uploadGeneratedImage = ({ fileName, buffer, mimeType, fieldname }) => {
+  return uploadBufferToDrive({
+    fieldname,
+    originalname: fileName,
+    mimetype: mimeType,
+    size: buffer.length,
+    buffer
+  });
 };
 
 const getDotPattern = (startX, startY) => {
@@ -204,7 +182,7 @@ exports.generateDigivalCardImages = async ({
   photoBase64,
   photoMimeType
 }) => {
-  const photo = saveBase64Image({
+  const photo = decodeBase64Image({
     base64: photoBase64,
     mimeType: photoMimeType || "image/png",
     employeeId
@@ -265,8 +243,6 @@ exports.generateDigivalCardImages = async ({
     .png()
     .toBuffer();
 
-  const frontFile = writeImageFile(frontFileName, frontBuffer);
-
   const backBase = await sharp(Buffer.from(createBackSvg({ bloodGroup, phone })))
     .png()
     .toBuffer();
@@ -287,20 +263,35 @@ exports.generateDigivalCardImages = async ({
     .png()
     .toBuffer();
 
-  const backFile = writeImageFile(backFileName, backBuffer);
+  const uploadedPhoto = await uploadGeneratedImage({
+    fileName: photo.fileName,
+    buffer: photo.buffer,
+    mimeType: photo.mimeType,
+    fieldname: "photo"
+  });
+  const frontFile = await uploadGeneratedImage({
+    fileName: frontFileName,
+    buffer: frontBuffer,
+    mimeType: "image/png",
+    fieldname: "front"
+  });
+  const backFile = await uploadGeneratedImage({
+    fileName: backFileName,
+    buffer: backBuffer,
+    mimeType: "image/png",
+    fieldname: "back"
+  });
 
   return {
-    photoUrl: photo.imageUrl,
-    photoDataUrl: photo.dataUrl,
-    photoPath: photo.filePath,
-    frontPath: frontFile.filePath,
-    backPath: backFile.filePath,
+    photoUrl: uploadedPhoto.imageUrl,
+    photoDriveFileId: uploadedPhoto.fileId,
     frontUrl: frontFile.imageUrl,
+    frontDriveFileId: frontFile.fileId,
     backUrl: backFile.imageUrl,
-    frontDataUrl: toDataUrl("image/png", frontBuffer),
-    backDataUrl: toDataUrl("image/png", backBuffer),
+    backDriveFileId: backFile.fileId,
     frontBuffer,
     backBuffer,
-    persistedToUploads: photo.persisted && frontFile.persisted && backFile.persisted
+    persistedToDrive: true,
+    persistedToUploads: false
   };
 };
