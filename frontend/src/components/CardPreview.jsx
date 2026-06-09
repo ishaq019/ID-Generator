@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
+import { resolveApiAssetUrl } from "../services/api";
 
 
 
@@ -102,6 +103,7 @@ function getNumberValue(formData, key, fallback) {
 
 function DigivalFront({ template, formData }) {
   const photo = getFieldValue(formData, template, "photo", "");
+  const photoSrc = resolveApiAssetUrl(photo);
   const name = getFieldValue(formData, template, "name", "");
   const employeeId = getFieldValue(formData, template, "employeeId", "");
   const photoX = getNumberValue(formData, "photoX", 0);
@@ -136,7 +138,7 @@ function DigivalFront({ template, formData }) {
 
           {photo ? (
             <img
-              src={photo}
+              src={photoSrc}
               alt="Employee"
               className="digival-employee-photo digival-employee-photo-body"
               style={photoBodyStyle}
@@ -151,7 +153,7 @@ function DigivalFront({ template, formData }) {
         {photo && (
           <div className="digival-photo-overflow" aria-hidden="true">
             <img
-              src={photo}
+              src={photoSrc}
               alt=""
               className="digival-employee-photo digival-employee-photo-top"
               style={photoOverflowStyle}
@@ -237,7 +239,7 @@ const value = formData?.[field.key] || "";
   if (field.type === "image") {
     return value ? (
       <img
-        src={value}
+        src={resolveApiAssetUrl(value)}
         alt={field.label}
         style={{
           ...commonStyle,
@@ -426,4 +428,3 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
 }
 
 export default CardPreview;
-

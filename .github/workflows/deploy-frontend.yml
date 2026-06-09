@@ -52,7 +52,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-
+# Set environment URL to the GitHub Pages URL after deployment
     environment:
       name: "github-pages"
       url: ${{ steps.deployment.outputs.page_url }}

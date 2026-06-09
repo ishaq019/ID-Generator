@@ -2,8 +2,28 @@ import axios from "axios";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  // "http://localhost:5000/api";
-  "https://id-generator-backend-jet.vercel.app/api";
+  "http://localhost:5000/api";
+  // "https://id-generator-backend-jet.vercel.app/api";
+
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+export const resolveApiAssetUrl = value => {
+  if (!value) return "";
+
+  if (/^(data:|blob:|https?:\/\/)/i.test(value)) {
+    return value;
+  }
+
+  if (value.startsWith("/api/")) {
+    return `${API_ORIGIN}${value}`;
+  }
+
+  if (value.startsWith("/")) {
+    return `${API_ORIGIN}${value}`;
+  }
+
+  return value;
+};
 
 const api = axios.create({
   baseURL: API_BASE_URL
@@ -37,12 +57,23 @@ export const cardAPI = {
 export const uploadAPI = {
   image: file => {
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append("photo", file);
 
-    return api.post("/upload/image", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
+    return api.post("/uploads/photo", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    }).then(response => {
+      const imageUrl =
+        response.data.imageUrl ||
+        response.data.file?.imageUrl ||
+        "";
+
+      return {
+        ...response,
+        data: {
+          ...response.data,
+          imageUrl: resolveApiAssetUrl(imageUrl)
+        }
+      };
     });
   }
 };

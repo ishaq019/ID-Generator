@@ -10,6 +10,7 @@ const seedDefaultTemplates = require("./utils/defaultTemplates");
 const templateRoutes = require("./routes/templateRoutes");
 const cardRoutes = require("./routes/cardRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const fileRoutes = require("./routes/fileRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const googleFormRoutes = require("./routes/googleFormRoutes");
 
@@ -77,10 +78,13 @@ const ensureServerReady = async (req, res, next) => {
   }
 };
 
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/files", fileRoutes);
+
 app.use("/api", ensureServerReady);
 app.use("/api/templates", templateRoutes);
 app.use("/api/cards", cardRoutes);
-app.use("/api/upload", uploadRoutes);
 app.use("/api/google-form", googleFormRoutes);
 
 app.use(notFound);

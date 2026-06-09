@@ -28,9 +28,30 @@ EMAIL_USER=your Gmail address
 EMAIL_PASS=your Gmail app password
 CLIENT_URL=http://localhost:5175
 CLIENT_URLS=http://localhost:5173,http://localhost:5175
+GOOGLE_DRIVE_FOLDER_ID=your Drive folder ID
+GOOGLE_DRIVE_CLIENT_ID=your OAuth client ID
+GOOGLE_DRIVE_CLIENT_SECRET=your OAuth client secret
+GOOGLE_DRIVE_REDIRECT_URI=https://developers.google.com/oauthplayground
+GOOGLE_DRIVE_REFRESH_TOKEN=your OAuth refresh token
 ```
 
 Use a Gmail app password for `EMAIL_PASS`; a normal Gmail account password will not work with Nodemailer.
+
+For Google Drive uploads, generate the refresh token from the same Google account that owns or can edit the target Drive folder. Enable the Google Drive API in the Google Cloud project that owns the OAuth client. Service-account credentials are still supported as a fallback through `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY`.
+
+## Image Upload Endpoint
+
+```txt
+POST /api/uploads/photo
+```
+
+Form-data field:
+
+```txt
+photo=<image file>
+```
+
+The response includes `imageUrl`, `fileId`, and `file` metadata. `imageUrl` points to `GET /api/files/:fileId`, which streams the image back from Google Drive.
 
 ## Google Form Endpoint
 
