@@ -16,6 +16,10 @@ router.get("/:fileId", async (req, res) => {
 
     const { buffer, metadata } = await downloadDriveFileAsBuffer(fileId);
 
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Content-Type", metadata.mimeType || "application/octet-stream");

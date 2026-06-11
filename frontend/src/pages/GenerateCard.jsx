@@ -173,7 +173,14 @@ const getFinalQrData = () => {
   }
 
   try {
-    const response = await uploadAPI.image(file);
+    const shouldRemoveBackground = fieldKey === "photo";
+
+const response = await uploadAPI.image(file, {
+  removeBackground: shouldRemoveBackground,
+  fileName: formData.employeeId
+    ? `${formData.employeeId}-photo.png`
+    : file.name
+});
 
     if (selectedTemplate?.layoutKey === "digival" && fieldKey === "photo") {
       setFormData(previousData => ({

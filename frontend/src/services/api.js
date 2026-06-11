@@ -2,10 +2,39 @@ import axios from "axios";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  // "http://localhost:5000/api";
-  "https://id-generator-backend-jet.vercel.app/api";
+  "http://localhost:5000/api";
+  // "https://id-generator-backend-jet.vercel.app/api";
 
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+
+const AUTH_TOKEN_KEY = "id_generator_auth_token";
+const AUTH_USER_KEY = "id_generator_auth_user";
+
+export const getAuthToken = () => {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+export const setAuthToken = token => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+};
+
+export const clearAuthToken = () => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+};
+
+export const getStoredAuthUser = () => {
+  try {
+    const user = localStorage.getItem(AUTH_USER_KEY);
+    return user ? JSON.parse(user) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setStoredAuthUser = user => {
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+};
 
 export const resolveApiAssetUrl = value => {
   if (!value) return "";
@@ -28,6 +57,41 @@ export const resolveApiAssetUrl = value => {
 const api = axios.create({
   baseURL: API_BASE_URL
 });
+
+api.interceptors.request.use(config => {
+  const token = getAuthToken();
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error?.response?.status === 401) {
+      clearAuthToken();
+
+      if (!window.location.pathname.endsWith("/login")) {
+        window.location.href = `${import.meta.env.BASE_URL || "/"}login`;
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export const authAPI = {
+  login: data => api.post("/auth/login", data),
+  me: () => api.get("/auth/me")
+};
+
+export const settingsAPI = {
+  get: () => api.get("/settings"),
+  update: data => api.put("/settings", data)
+};
 
 export const templateAPI = {
   getAll: category =>
@@ -55,9 +119,17 @@ export const cardAPI = {
 };
 
 export const uploadAPI = {
-  image: file => {
+  image: (file, options = {}) => {
     const formData = new FormData();
     formData.append("photo", file);
+
+    if (options.removeBackground) {
+      formData.append("removeBackground", "true");
+    }
+
+    if (options.fileName) {
+      formData.append("fileName", options.fileName);
+    }
 
     return api.post("/uploads/photo", formData, {
       headers: { "Content-Type": "multipart/form-data" }

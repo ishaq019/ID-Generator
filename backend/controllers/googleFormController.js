@@ -2,10 +2,14 @@ const Template = require("../models/Template");
 const GeneratedCard = require("../models/GeneratedCard");
 const { sendIdCardSubmissionEmail } = require("../utils/emailService");
 const { uploadBufferToDrive } = require("../utils/googleDriveStorage");
+const { removeBackgroundFromUpload } = require("../utils/backgroundRemoval");
+const { getAppSettings } = require("../utils/settingsService");
 
-const getDigivalTemplateSlug = () => {
-  return process.env.DIGIVAL_TEMPLATE_SLUG || "digival-employee-id-card";
-};
+// const getDigivalTemplateSlug = () => {
+//   return process.env.DIGIVAL_TEMPLATE_SLUG || "digival-employee-id-card";
+// };
+
+
 
 const DIGIVAL_ADDRESS =
   "5th Floor Right Wing, Chennai Citi Centre,\nDr Radhakrishnan Salai, Mylapore,\nChennai - 600004, Tamil Nadu, India";
@@ -206,15 +210,21 @@ const sendConfirmationForExistingCard = async card => {
 
 exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
   try {
-    if (!process.env.WEBHOOK_SECRET) {
+    const settings = await getAppSettings();
+
+    const expectedWebhookSecret =
+      settings.googleFormWebhookSecret || process.env.WEBHOOK_SECRET;
+
+    if (!expectedWebhookSecret) {
       return res.status(500).json({
-        message: "WEBHOOK_SECRET is not configured on the backend"
+        message:
+          "Google Form webhook secret is not configured. Add it in Settings or WEBHOOK_SECRET env."
       });
     }
 
     const secret = String(req.headers["x-webhook-secret"] || "");
 
-    if (secret !== process.env.WEBHOOK_SECRET) {
+    if (secret !== expectedWebhookSecret) {
       return res.status(401).json({ message: "Invalid webhook secret" });
     }
 
@@ -268,9 +278,13 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       });
     }
 
-    const template = await Template.findOne({
-      slug: getDigivalTemplateSlug()
-    });
+    const templateSlug =
+      settings.digivalTemplateSlug ||
+      process.env.DIGIVAL_TEMPLATE_SLUG ||
+      "digival-employee-id-card";
+    const template =
+      (await Template.findOne({ slug: templateSlug })) ||
+      (await Template.findOne({ layoutKey: "digival" }));
 
     if (!template) {
       return res.status(404).json({
@@ -281,7 +295,34 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
     let uploadedPhoto;
 
     try {
-      uploadedPhoto = await uploadBufferToDrive(buildGoogleFormPhotoFile(payload));
+      const originalPhotoFile = buildGoogleFormPhotoFile(payload);
+
+      const safeEmployeeId = String(payload.employeeId || "employee")
+        .replace(/[^\w.-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const stablePhotoName = `${safeEmployeeId || "employee"}-photo.png`;
+      const shouldRemoveBg =
+        settings.backgroundRemovalEnabled !== false &&
+        settings.googleFormRemoveBg !== false &&
+        process.env.GOOGLE_FORM_REMOVE_BG !== "false";
+
+      const photoFile = shouldRemoveBg
+        ? await removeBackgroundFromUpload(originalPhotoFile, {
+            fileName: stablePhotoName,
+            model: settings.bgRemovalModel,
+            maxDimension: settings.bgRemovalMaxDimension
+          })
+        : {
+            ...originalPhotoFile,
+            driveFileName: stablePhotoName,
+            originalname: stablePhotoName
+          };
+
+      uploadedPhoto = await uploadBufferToDrive(photoFile, {
+        fileName: stablePhotoName,
+        replaceExisting: true
+      });
+
     } catch (uploadError) {
       return res.status(uploadError.statusCode || 502).json({
         message: "Google Form photo could not be saved to Google Drive",
@@ -295,8 +336,8 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       bloodGroup: payload.bloodGroup,
       phone: payload.phone,
       email: payload.email,
-      address: DIGIVAL_ADDRESS,
-      website: "www.digi-val.com",
+      address: settings.companyAddress || DIGIVAL_ADDRESS,
+      website: settings.companyWebsite || "www.digi-val.com",
       photo: uploadedPhoto.imageUrl,
       photoDriveFileId: uploadedPhoto.fileId
     };

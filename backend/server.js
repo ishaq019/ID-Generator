@@ -7,12 +7,18 @@ dotenv.config();
 
 const connectDB = require("./config/db");
 const seedDefaultTemplates = require("./utils/defaultTemplates");
+const { getAppSettings } = require("./utils/settingsService");
+
+const authRoutes = require("./routes/authRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const cardRoutes = require("./routes/cardRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const fileRoutes = require("./routes/fileRoutes");
-const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const googleFormRoutes = require("./routes/googleFormRoutes");
+
+const { protect } = require("./middleware/authMiddleware");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
 
@@ -41,8 +47,14 @@ app.use(
 
 app.options("*", cors());
 
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || "25mb" }));
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: process.env.REQUEST_BODY_LIMIT || "25mb"
+  })
+);
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.get("/", (req, res) => {
@@ -60,6 +72,7 @@ const prepareServer = async () => {
     serverReadyPromise = (async () => {
       await connectDB();
       await seedDefaultTemplates();
+      await getAppSettings();
     })().catch(error => {
       serverReadyPromise = null;
       throw error;
@@ -78,14 +91,26 @@ const ensureServerReady = async (req, res, next) => {
   }
 };
 
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/upload", uploadRoutes);
+/*
+  Public:
+  - auth/login must be public.
+  - files must be public because <img src=""> cannot send Authorization header.
+  - google-form route stays public from login, but protected using x-webhook-secret.
+*/
+app.use("/api/auth", authRoutes);
 app.use("/api/files", fileRoutes);
 
 app.use("/api", ensureServerReady);
-app.use("/api/templates", templateRoutes);
-app.use("/api/cards", cardRoutes);
 app.use("/api/google-form", googleFormRoutes);
+
+/*
+  Protected admin routes.
+*/
+app.use("/api/settings", protect, settingsRoutes);
+app.use("/api/uploads", protect, uploadRoutes);
+app.use("/api/upload", protect, uploadRoutes);
+app.use("/api/templates", protect, templateRoutes);
+app.use("/api/cards", protect, cardRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

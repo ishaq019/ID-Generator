@@ -1,77 +1,91 @@
 const express = require("express");
 const upload = require("../middleware/uploadMiddleware");
 const { uploadBufferToDrive } = require("../utils/googleDriveStorage");
+const { removeBackgroundFromUpload } = require("../utils/backgroundRemoval");
+const { getAppSettings } = require("../utils/settingsService");
 
 const router = express.Router();
 
-const getUploadErrorStatus = error => {
-  if (error?.code === 401 || error?.response?.status === 401) return 401;
-  if (error?.code === 403 || error?.response?.status === 403) return 403;
-
-  return 500;
-};
-
-const getUploadErrorMessage = error => {
-  const message = error?.message || "Image upload failed";
-
-  if (message.includes("DECODER routines") || message.includes("unsupported")) {
-    return "Google Drive credentials are invalid for the selected auth method. Check your OAuth client ID, client secret, refresh token, and remove invalid private-key values.";
-  }
-
-  if (message.includes("invalid_grant")) {
-    return "Google Drive refresh token is invalid or expired. Generate a new refresh token.";
-  }
-
-  if (message.includes("insufficient authentication scopes")) {
-    return "Google Drive refresh token does not include Drive upload permission. Generate it with Drive API scope.";
-  }
-
-  return message;
+const shouldRemoveBackground = value => {
+  return [true, "true", "1", "yes", "on"].includes(value);
 };
 
 const createUploadHandler = fieldName => [
   upload.single(fieldName),
+
   async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: `Image file is required in the "${fieldName}" field`
+          message: `Image file is required in "${fieldName}" field`
         });
       }
 
-      const uploadedFile = await uploadBufferToDrive(req.file);
+      const settings = await getAppSettings();
+      const requestedRemoveBg = shouldRemoveBackground(req.body?.removeBackground);
+      const removeBg =
+        requestedRemoveBg && settings.backgroundRemovalEnabled !== false;
 
-      res.status(201).json({
+      console.log("UPLOAD RECEIVED:", {
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        requestedRemoveBg,
+        removeBg
+      });
+
+      let fileToUpload = req.file;
+
+      if (removeBg) {
+        try {
+          fileToUpload = await removeBackgroundFromUpload(req.file, {
+            fileName: req.body?.fileName || req.file.originalname,
+            model: settings.bgRemovalModel,
+            maxDimension: settings.bgRemovalMaxDimension
+          });
+        } catch (bgError) {
+          console.error("BACKGROUND REMOVAL FAILED:", bgError);
+
+          return res.status(500).json({
+            success: false,
+            message: bgError.message || "Background removal failed"
+          });
+        }
+      }
+
+      const uploadedFile = await uploadBufferToDrive(fileToUpload, {
+        fileName: fileToUpload.driveFileName || fileToUpload.originalname,
+        replaceExisting: true
+      });
+
+      const versionedUrl = `${uploadedFile.imageUrl}?v=${Date.now()}`;
+
+      return res.status(201).json({
         success: true,
-        message: "Image uploaded successfully",
-        imageUrl: uploadedFile.imageUrl,
+        message: removeBg
+          ? "Background removed and image uploaded successfully"
+          : "Image uploaded successfully",
+        backgroundRemoved: removeBg,
+        imageUrl: versionedUrl,
         fileId: uploadedFile.fileId,
-        file: uploadedFile
+        file: {
+          ...uploadedFile,
+          imageUrl: versionedUrl
+        }
       });
     } catch (error) {
-      res.status(getUploadErrorStatus(error)).json({
+      console.error("UPLOAD ERROR:", error);
+
+      return res.status(500).json({
         success: false,
-        message: getUploadErrorMessage(error)
+        message: error.message || "Image upload failed"
       });
     }
   }
 ];
 
 router.post("/photo", ...createUploadHandler("photo"));
-
-// Backward-compatible route for older frontend builds.
 router.post("/image", ...createUploadHandler("image"));
-
-router.use((error, req, res, next) => {
-  if (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message || "Image upload failed"
-    });
-  }
-
-  next();
-});
 
 module.exports = router;

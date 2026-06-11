@@ -18,7 +18,11 @@ const getOAuthClient = () => {
     GOOGLE_DRIVE_REFRESH_TOKEN
   } = process.env;
 
-  if (!GOOGLE_DRIVE_CLIENT_ID || !GOOGLE_DRIVE_CLIENT_SECRET || !GOOGLE_DRIVE_REFRESH_TOKEN) {
+  if (
+    !GOOGLE_DRIVE_CLIENT_ID ||
+    !GOOGLE_DRIVE_CLIENT_SECRET ||
+    !GOOGLE_DRIVE_REFRESH_TOKEN
+  ) {
     throw new Error(
       "Google Drive OAuth credentials are missing. Set GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, and GOOGLE_DRIVE_REFRESH_TOKEN."
     );
@@ -62,7 +66,7 @@ const getJwtClient = () => {
 
   if (!clientEmail || !privateKey) {
     throw new Error(
-      "Google Drive credentials are missing. Set GOOGLE_DRIVE_CLIENT_ID/GOOGLE_DRIVE_CLIENT_SECRET/GOOGLE_DRIVE_REFRESH_TOKEN, or GOOGLE_CLIENT_EMAIL/GOOGLE_PRIVATE_KEY."
+      "Google Drive credentials are missing. Set OAuth credentials or GOOGLE_CLIENT_EMAIL/GOOGLE_PRIVATE_KEY."
     );
   }
 
@@ -74,7 +78,9 @@ const getJwtClient = () => {
 };
 
 const getGoogleDrive = () => {
-  if (driveClient) return driveClient;
+  if (driveClient) {
+    return driveClient;
+  }
 
   const auth = hasOAuthCredentials() ? getOAuthClient() : getJwtClient();
 
