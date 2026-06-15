@@ -1,17 +1,38 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { cardAPI, templateAPI, uploadAPI } from "../services/api";
 import CardPreview from "../components/CardPreview";
 import ExportButtons from "../components/ExportButtons";
+import { cardAPI, templateAPI, uploadAPI } from "../services/api";
+
+const DIGIVAL_HIDDEN_FIELDS = ["address", "website", "qr"];
+const DIGIVAL_PHOTO_DEFAULTS = {
+  photoX: "0",
+  photoY: "0",
+  photoWidth: "300",
+  photoHeight: "346",
+};
+const DIGIVAL_PHOTO_ADJUST_FIELDS = [
+  { key: "photoX", label: "X", min: -80, max: 80 },
+  { key: "photoY", label: "Y", min: -80, max: 80 },
+  { key: "photoWidth", label: "Width", min: 180, max: 440 },
+  { key: "photoHeight", label: "Height", min: 220, max: 520 },
+];
+
+const buildEmptyFormData = (fields = []) => {
+  return fields.reduce((emptyData, field) => {
+    emptyData[field.key] = "";
+    return emptyData;
+  }, {});
+};
+
+const isDigiValTemplate = (template) => {
+  return template?.layoutKey === "digival";
+};
 
 function GenerateCard() {
-
-  
   const { templateId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-
   const cardId = searchParams.get("cardId");
 
   const [templates, setTemplates] = useState([]);
@@ -19,68 +40,36 @@ function GenerateCard() {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [formData, setFormData] = useState({});
   const [qrData, setQrData] = useState("");
-
   const [editingSavedCardId, setEditingSavedCardId] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const isHiddenDigiValField = (field) => {
+    return isDigiValTemplate(selectedTemplate) && DIGIVAL_HIDDEN_FIELDS.includes(field.key);
+  };
 
- const DIGIVAL_HIDDEN_FIELDS = ["address", "website", "qr"];
- const DIGIVAL_PHOTO_DEFAULTS = {
-  photoX: "0",
-  photoY: "0",
-  photoWidth: "300",
-  photoHeight: "346"
-};
-const DIGIVAL_PHOTO_ADJUST_FIELDS = [
-  { key: "photoX", label: "X", min: -80, max: 80 },
-  { key: "photoY", label: "Y", min: -80, max: 80 },
-  { key: "photoWidth", label: "Width", min: 180, max: 440 },
-  { key: "photoHeight", label: "Height", min: 220, max: 520 }
-];
+  const isDigiValPhotoField = (field) => {
+    return isDigiValTemplate(selectedTemplate) && field.key === "photo";
+  };
 
-const isHiddenDigiValField = field => {
-  return (
-    selectedTemplate?.layoutKey === "digival" &&
-    DIGIVAL_HIDDEN_FIELDS.includes(field.key)
-  );
-};
-
-const isDigiValPhotoField = field => {
-  return selectedTemplate?.layoutKey === "digival" && field.key === "photo";
-};
-
-const getPreparedFormData = () => {
-  if (selectedTemplate?.layoutKey !== "digival") {
-    return formData;
-  }
-
-  const preparedData = { ...formData };
-
-  selectedTemplate.fields?.forEach(field => {
-    if (["address", "website"].includes(field.key)) {
-      preparedData[field.key] = field.defaultValue || "";
+  const getPreparedFormData = () => {
+    if (!isDigiValTemplate(selectedTemplate)) {
+      return formData;
     }
-  });
 
-  return preparedData;
-};
+    const preparedData = { ...formData };
 
-const getFinalQrData = () => {
-  return selectedTemplate?.layoutKey === "digival"
-    ? "STATIC_DIGIVAL_QR"
-    : qrData;
-};
-
-  const buildEmptyFormData = fields => {
-    const emptyData = {};
-
-    fields.forEach(field => {
-      emptyData[field.key] = "";
+    selectedTemplate.fields?.forEach((field) => {
+      if (["address", "website"].includes(field.key)) {
+        preparedData[field.key] = field.defaultValue || "";
+      }
     });
 
-    return emptyData;
+    return preparedData;
+  };
+
+  const getFinalQrData = () => {
+    return isDigiValTemplate(selectedTemplate) ? "STATIC_DIGIVAL_QR" : qrData;
   };
 
   useEffect(() => {
@@ -94,15 +83,12 @@ const getFinalQrData = () => {
         if (cardId) {
           const cardResponse = await cardAPI.getById(cardId);
           const savedCard = cardResponse.data;
-
-          const savedTemplateId =
-            savedCard.templateId?._id || savedCard.templateId;
+          const savedTemplateId = savedCard.templateId?._id || savedCard.templateId;
 
           setEditingSavedCardId(savedCard._id);
           setSelectedTemplateId(savedTemplateId);
           setFormData(savedCard.formData || {});
           setQrData(savedCard.qrData || "");
-
           return;
         }
 
@@ -127,11 +113,8 @@ const getFinalQrData = () => {
         setSelectedTemplate(response.data);
 
         if (!cardId) {
-          const emptyData = buildEmptyFormData(response.data.fields || []);
-          setFormData(emptyData);
-          setQrData(
-            response.data.layoutKey === "digival" ? "STATIC_DIGIVAL_QR" : ""
-          );
+          setFormData(buildEmptyFormData(response.data.fields));
+          setQrData(response.data.layoutKey === "digival" ? "STATIC_DIGIVAL_QR" : "");
         }
       } catch (error) {
         alert(error.response?.data?.message || "Failed to load selected template");
@@ -141,7 +124,7 @@ const getFinalQrData = () => {
     fetchSelectedTemplate();
   }, [selectedTemplateId, cardId]);
 
-  const handleTemplateChange = newTemplateId => {
+  const handleTemplateChange = (newTemplateId) => {
     setSelectedTemplateId(newTemplateId);
     setEditingSavedCardId("");
     setFormData({});
@@ -152,56 +135,47 @@ const getFinalQrData = () => {
   const updateValue = (key, value) => {
     const updatedData = {
       ...formData,
-      [key]: value
+      [key]: value,
     };
 
     setFormData(updatedData);
-
-    if (selectedTemplate?.layoutKey === "digival") {
-      setQrData("STATIC_DIGIVAL_QR");
-    } else {
-      setQrData(JSON.stringify(updatedData));
-    }
+    setQrData(isDigiValTemplate(selectedTemplate) ? "STATIC_DIGIVAL_QR" : JSON.stringify(updatedData));
   };
 
- const handleImageUpload = async (fieldKey, file) => {
-  if (!file) return;
+  const handleImageUpload = async (fieldKey, file) => {
+    if (!file) return;
 
-  if (!file.type.startsWith("image/")) {
-    alert("Only image files are allowed");
-    return;
-  }
-
-  try {
-    const shouldRemoveBackground = fieldKey === "photo";
-
-const response = await uploadAPI.image(file, {
-  removeBackground: shouldRemoveBackground,
-  fileName: formData.employeeId
-    ? `${formData.employeeId}-photo.png`
-    : file.name
-});
-
-    if (selectedTemplate?.layoutKey === "digival" && fieldKey === "photo") {
-      setFormData(previousData => ({
-        ...DIGIVAL_PHOTO_DEFAULTS,
-        ...previousData,
-        photo: response.data.imageUrl
-      }));
-      setQrData("STATIC_DIGIVAL_QR");
+    if (!file.type.startsWith("image/")) {
+      alert("Only image files are allowed");
       return;
     }
 
-    updateValue(fieldKey, response.data.imageUrl);
-  } catch (error) {
-    alert(error.response?.data?.message || "Image upload failed");
-  }
-};
+    try {
+      const response = await uploadAPI.image(file, {
+        removeBackground: fieldKey === "photo",
+        fileName: formData.employeeId ? `${formData.employeeId}-photo.png` : file.name,
+      });
+
+      if (isDigiValTemplate(selectedTemplate) && fieldKey === "photo") {
+        setFormData((previousData) => ({
+          ...DIGIVAL_PHOTO_DEFAULTS,
+          ...previousData,
+          photo: response.data.imageUrl,
+        }));
+        setQrData("STATIC_DIGIVAL_QR");
+        return;
+      }
+
+      updateValue(fieldKey, response.data.imageUrl);
+    } catch (error) {
+      alert(error.response?.data?.message || "Image upload failed");
+    }
+  };
 
   const validateForm = () => {
     if (!selectedTemplate) return false;
 
-    const requiredFields = selectedTemplate.fields.filter(field => field.required);
+    const requiredFields = selectedTemplate.fields.filter((field) => field.required);
 
     for (const field of requiredFields) {
       if (!formData[field.key]) {
@@ -211,7 +185,7 @@ const response = await uploadAPI.image(file, {
     }
 
     const emailFields = selectedTemplate.fields.filter(
-      field => field.type === "email" && formData[field.key]
+      (field) => field.type === "email" && formData[field.key]
     );
 
     for (const field of emailFields) {
@@ -223,8 +197,6 @@ const response = await uploadAPI.image(file, {
 
     return true;
   };
-
- 
 
   const saveCard = async () => {
     if (!validateForm()) return;
@@ -238,20 +210,21 @@ const response = await uploadAPI.image(file, {
         photo: formData.photo || "",
         logo: formData.logo || "",
         qrData: getFinalQrData(),
-        templateSnapshot: selectedTemplate
+        templateSnapshot: selectedTemplate,
       };
 
       if (editingSavedCardId) {
         await cardAPI.update(editingSavedCardId, payload);
         alert("Card updated successfully");
-      } else {
-        const response = await cardAPI.create(payload);
-        setEditingSavedCardId(response.data._id);
-        navigate(`/generate/${selectedTemplate._id}?cardId=${response.data._id}`, {
-          replace: true
-        });
-        alert("Card saved successfully");
+        return;
       }
+
+      const response = await cardAPI.create(payload);
+      setEditingSavedCardId(response.data._id);
+      navigate(`/generate/${selectedTemplate._id}?cardId=${response.data._id}`, {
+        replace: true,
+      });
+      alert("Card saved successfully");
     } catch (error) {
       alert(error.response?.data?.message || "Failed to save card");
     } finally {
@@ -272,11 +245,7 @@ const response = await uploadAPI.image(file, {
       <div className="page-header">
         <div>
           <span className="eyebrow">Generate ID Card</span>
-          <h1>
-            {editingSavedCardId
-              ? "Edit saved ID card"
-              : "Fill details and generate your ID card"}
-          </h1>
+          <h1>{editingSavedCardId ? "Edit saved ID card" : "Fill details and generate your ID card"}</h1>
           <p>
             Save once to store the card in the project database, then manage it
             from Generated Cards.
@@ -289,11 +258,7 @@ const response = await uploadAPI.image(file, {
             onClick={saveCard}
             disabled={saving || !selectedTemplate}
           >
-            {saving
-              ? "Saving..."
-              : editingSavedCardId
-                ? "Update Card"
-                : "Save Card"}
+            {saving ? "Saving..." : editingSavedCardId ? "Update Card" : "Save Card"}
           </button>
 
           <Link className="btn dark" to="/cards">
@@ -315,9 +280,9 @@ const response = await uploadAPI.image(file, {
               Select Template
               <select
                 value={selectedTemplateId}
-                onChange={event => handleTemplateChange(event.target.value)}
+                onChange={(event) => handleTemplateChange(event.target.value)}
               >
-                {templates.map(template => (
+                {templates.map((template) => (
                   <option key={template._id} value={template._id}>
                     {template.templateName}
                   </option>
@@ -325,61 +290,61 @@ const response = await uploadAPI.image(file, {
               </select>
             </label>
 
-   {selectedTemplate?.fields
-  ?.filter(field => field.type !== "qr")
-  .filter(field => !isHiddenDigiValField(field))
-  .map(field => (
+            {selectedTemplate?.fields
+              ?.filter((field) => field.type !== "qr")
+              .filter((field) => !isHiddenDigiValField(field))
+              .map((field) => (
                 <label key={field._id || field.key}>
                   {field.label} {field.required && <span className="required">*</span>}
 
                   {field.type === "image" ? (
-  <>
-   <input
-  type="file"
-  accept={
-    isDigiValPhotoField(field)
-      ? "image/png,image/jpeg,image/jpg,image/webp"
-      : "image/*"
-  }
-  onChange={event =>
-    handleImageUpload(field.key, event.target.files[0])
-  }
-/>
+                    <>
+                      <input
+                        type="file"
+                        accept={
+                          isDigiValPhotoField(field)
+                            ? "image/png,image/jpeg,image/jpg,image/webp"
+                            : "image/*"
+                        }
+                        onChange={(event) =>
+                          handleImageUpload(field.key, event.target.files[0])
+                        }
+                      />
 
-    {isDigiValPhotoField(field) && (
-      <>
-        <span className="helper-text">
-          Upload a straight-facing portrait. PNG with transparent background is
-          best, but JPG and WEBP are accepted.
-        </span>
+                      {isDigiValPhotoField(field) && (
+                        <>
+                          <span className="helper-text">
+                            Upload a straight-facing portrait. PNG with transparent
+                            background is best, but JPG and WEBP are accepted.
+                          </span>
 
-        <div className="photo-adjust-grid">
-          {DIGIVAL_PHOTO_ADJUST_FIELDS.map(setting => (
-            <label key={setting.key}>
-              {setting.label}
-              <input
-                type="number"
-                min={setting.min}
-                max={setting.max}
-                step="1"
-                value={
-                  formData[setting.key] ??
-                  DIGIVAL_PHOTO_DEFAULTS[setting.key]
-                }
-                onChange={event =>
-                  updateValue(setting.key, event.target.value)
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </>
-    )}
-  </>
-) : field.type === "textarea" ? (
+                          <div className="photo-adjust-grid">
+                            {DIGIVAL_PHOTO_ADJUST_FIELDS.map((setting) => (
+                              <label key={setting.key}>
+                                {setting.label}
+                                <input
+                                  type="number"
+                                  min={setting.min}
+                                  max={setting.max}
+                                  step="1"
+                                  value={
+                                    formData[setting.key] ??
+                                    DIGIVAL_PHOTO_DEFAULTS[setting.key]
+                                  }
+                                  onChange={(event) =>
+                                    updateValue(setting.key, event.target.value)
+                                  }
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : field.type === "textarea" ? (
                     <textarea
                       value={formData[field.key] || ""}
-                      onChange={event => updateValue(field.key, event.target.value)}
+                      onChange={(event) => updateValue(field.key, event.target.value)}
                       placeholder={field.defaultValue || field.label}
                     />
                   ) : (
@@ -394,19 +359,19 @@ const response = await uploadAPI.image(file, {
                               : "text"
                       }
                       value={formData[field.key] || ""}
-                      onChange={event => updateValue(field.key, event.target.value)}
+                      onChange={(event) => updateValue(field.key, event.target.value)}
                       placeholder={field.defaultValue || field.label}
                     />
                   )}
                 </label>
               ))}
 
-            {selectedTemplate?.layoutKey !== "digival" && (
+            {!isDigiValTemplate(selectedTemplate) && (
               <label>
                 QR Data
                 <textarea
                   value={qrData}
-                  onChange={event => setQrData(event.target.value)}
+                  onChange={(event) => setQrData(event.target.value)}
                   placeholder="QR data will auto-fill from form data"
                 />
               </label>
@@ -415,11 +380,11 @@ const response = await uploadAPI.image(file, {
 
           <div className="panel preview-panel">
             <h2>Live Preview</h2>
-           <CardPreview
-  template={selectedTemplate}
-  formData={getPreparedFormData()}
-  qrData={getFinalQrData()}
-/>
+            <CardPreview
+              template={selectedTemplate}
+              formData={getPreparedFormData()}
+              qrData={getFinalQrData()}
+            />
             <ExportButtons />
           </div>
         </div>

@@ -2,10 +2,7 @@ import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { resolveApiAssetUrl } from "../services/api";
 
-
-
-
-const publicAsset = path => {
+const publicAsset = (path) => {
   return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
 };
 
@@ -24,20 +21,6 @@ function getSafeQrSize(field) {
   const width = Number(field.width) || 100;
   return Math.max(48, width - 12);
 }
-
-function buildDigivalQrLogo() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
-      <rect width="80" height="80" rx="14" fill="white" />
-      <text x="30" y="54" font-size="52" font-weight="700" fill="#111111" font-family="Georgia, serif">D</text>
-      <path d="M46 24 L56 36 L72 8 L59 14 L47 29 L42 24 Z" fill="#2196f3" />
-    </svg>
-  `;
-
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
-const digivalQrLogo = buildDigivalQrLogo();
 
 function DigivalLogo() {
   return (
@@ -67,9 +50,9 @@ function DotCluster({ left = 28, top = 20 }) {
             borderRadius: "50%",
             background: "#2f9be8",
             left: col * dotGap,
-            top: row * dotGap
+            top: row * dotGap,
           }}
-        />
+        />,
       );
     }
   }
@@ -81,7 +64,7 @@ function DotCluster({ left = 28, top = 20 }) {
         left,
         top,
         width: dotGap * 4 + dotSize,
-        height: dotGap * 5 + dotSize
+        height: dotGap * 5 + dotSize,
       }}
     >
       {dots}
@@ -90,7 +73,7 @@ function DotCluster({ left = 28, top = 20 }) {
 }
 
 function findField(template, key) {
-  return template.fields?.find(field => field.key === key);
+  return template.fields?.find((field) => field.key === key);
 }
 
 function getFieldValue(formData, template, key, fallback = "") {
@@ -114,15 +97,15 @@ function DigivalFront({ template, formData }) {
   const photoBaseStyle = {
     left: `${photoX}px`,
     width: `${photoWidth}px`,
-    height: `${photoHeight}px`
+    height: `${photoHeight}px`,
   };
   const photoBodyStyle = {
     ...photoBaseStyle,
-    top: `${photoY - 62}px`
+    top: `${photoY - 62}px`,
   };
   const photoOverflowStyle = {
     ...photoBaseStyle,
-    top: `${photoY}px`
+    top: `${photoY}px`,
   };
 
   return (
@@ -146,9 +129,7 @@ function DigivalFront({ template, formData }) {
               crossOrigin="anonymous"
             />
           ) : (
-            <div className="digival-photo-placeholder">
-              Photo
-            </div>
+            <div className="digival-photo-placeholder">Photo</div>
           )}
         </div>
 
@@ -184,20 +165,16 @@ function DigivalBack({ template, formData }) {
 
       <div className="digival-qr-box">
         <img
-  src={publicAsset("digival/digival-qr.png")}
-  alt="DigiVal QR"
-  className="digival-static-qr"
-  crossOrigin="anonymous"
-/>
+          src={publicAsset("digival/digival-qr.png")}
+          alt="DigiVal QR"
+          className="digival-static-qr"
+          crossOrigin="anonymous"
+        />
       </div>
 
-      <div className="digival-blood">
-        Blood Group: {bloodGroup}
-      </div>
+      <div className="digival-blood">Blood Group: {bloodGroup}</div>
 
-      <div className="digival-address-title">
-        Office Address
-      </div>
+      <div className="digival-address-title">Office Address</div>
 
       <div className="digival-address">
         5th Floor Right Wing, Chennai Citi Centre,
@@ -205,18 +182,14 @@ function DigivalBack({ template, formData }) {
         {"\n"}Chennai - 600004, Tamil Nadu, India
       </div>
 
-      <div className="digival-phone">
-        Ph no: {phone}
-      </div>
+      <div className="digival-phone">Ph no: {phone}</div>
 
-      <div className="digival-website">
-        www.digi-val.com
-      </div>
+      <div className="digival-website">www.digi-val.com</div>
     </div>
   );
 }
 function renderField(field, formData, qrData) {
-const value = formData?.[field.key] || "";
+  const value = formData?.[field.key] || "";
   const commonStyle = {
     position: "absolute",
     left: `${field.x || 0}px`,
@@ -230,12 +203,9 @@ const value = formData?.[field.key] || "";
     fontStyle: field.italic ? "italic" : "normal",
     textDecoration: field.underline ? "underline" : "none",
     overflow: "hidden",
-
-    // important fix
     whiteSpace: field.type === "textarea" ? "pre-wrap" : "nowrap",
     wordBreak: field.type === "textarea" ? "break-word" : "normal",
-
-    lineHeight: "1.35"
+    lineHeight: "1.35",
   };
 
   if (field.show === false) return null;
@@ -250,7 +220,7 @@ const value = formData?.[field.key] || "";
           ...commonStyle,
           objectFit: "cover",
           borderRadius: getImageRadius(field.imageShape),
-          border: "2px solid rgba(255,255,255,0.85)"
+          border: "2px solid rgba(255,255,255,0.85)",
         }}
       />
     ) : (
@@ -263,7 +233,7 @@ const value = formData?.[field.key] || "";
           display: "grid",
           placeItems: "center",
           color: "#64748b",
-          fontSize: "11px"
+          fontSize: "11px",
         }}
       >
         {field.label}
@@ -280,7 +250,7 @@ const value = formData?.[field.key] || "";
           placeItems: "center",
           background: "#ffffff",
           borderRadius: "12px",
-          padding: "6px"
+          padding: "6px",
         }}
       >
         <QRCodeCanvas
@@ -296,7 +266,7 @@ const value = formData?.[field.key] || "";
 
 function GenericCardSide({ template, side, formData, qrData }) {
   const design = side === "front" ? template.frontDesign : template.backDesign;
-  const fields = template.fields?.filter(field => field.side === side) || [];
+  const fields = template.fields?.filter((field) => field.side === side) || [];
 
   return (
     <div
@@ -310,7 +280,7 @@ function GenericCardSide({ template, side, formData, qrData }) {
         boxShadow: design?.shadow
           ? "0 24px 60px rgba(15, 23, 42, 0.18)"
           : "none",
-        fontFamily: template.styles?.fontFamily || "Inter, Arial, sans-serif"
+        fontFamily: template.styles?.fontFamily || "Inter, Arial, sans-serif",
       }}
     >
       {fields.map((field, index) => (
@@ -327,7 +297,7 @@ function CardSide({ template, side, formData, qrData }) {
     return side === "front" ? (
       <DigivalFront template={template} formData={formData} />
     ) : (
-      <DigivalBack template={template} formData={formData} qrData={qrData} />
+      <DigivalBack template={template} formData={formData} />
     );
   }
 
@@ -352,7 +322,9 @@ function CardPreview({ template, formData = {}, qrData = "" }) {
   const showFront = () => setActiveSide("front");
   const showBack = () => setActiveSide("back");
   const showPrevious = () => {
-    setActiveSide(currentSide => (currentSide === "front" ? "back" : "front"));
+    setActiveSide((currentSide) =>
+      currentSide === "front" ? "back" : "front",
+    );
   };
   const showNext = showPrevious;
 

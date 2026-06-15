@@ -22,7 +22,7 @@ function Home() {
           <div className="sample-card sample-card-one">
             <div className="sample-logo" />
             <div className="sample-photo" />
-            <h3>Syed Ishaq</h3>
+            <h3>User Name</h3>
             <p>Software Developer Intern</p>
             <span>EMP-1024</span>
           </div>

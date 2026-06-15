@@ -20,13 +20,6 @@ function isDigiValCard(card) {
   );
 }
 
-function getEmailStatusLabel(status) {
-  if (status === "sent") return "Email sent";
-  if (status === "failed") return "Email failed";
-  if (status === "pending") return "Email pending";
-  return "";
-}
-
 function GeneratedCards() {
   const [searchParams] = useSearchParams();
   const templateFilterId = searchParams.get("templateId");
@@ -161,19 +154,6 @@ function GeneratedCards() {
                   )}
                   {isDigiValCard(card) && (
                     <div className="mini-badge">DigiVal</div>
-                  )}
-                  {getEmailStatusLabel(card.emailStatus) && (
-                    <div
-                      className={
-                        card.emailStatus === "sent"
-                          ? "mini-badge success"
-                          : card.emailStatus === "failed"
-                            ? "mini-badge danger"
-                            : "mini-badge"
-                      }
-                    >
-                      {getEmailStatusLabel(card.emailStatus)}
-                    </div>
                   )}
                 </div>
 

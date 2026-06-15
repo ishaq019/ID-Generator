@@ -144,10 +144,34 @@ function ExportButtons() {
 
   return (
     <div className="button-row">
-      <button className="btn secondary" onClick={() => downloadPNG("front-card-export")} disabled={isExporting}>Download Front PNG</button>
-      <button className="btn secondary" onClick={() => downloadPNG("back-card-export")} disabled={isExporting}>Download Back PNG</button>
-      <button className="btn primary" onClick={downloadPDF} disabled={isExporting}>Download PDF</button>
-      <button className="btn dark" onClick={() => window.print()} disabled={isExporting}>Print</button>
+      <button
+        className="btn secondary"
+        onClick={() => downloadPNG("front-card-export")}
+        disabled={isExporting}
+      >
+        Download Front PNG
+      </button>
+      <button
+        className="btn secondary"
+        onClick={() => downloadPNG("back-card-export")}
+        disabled={isExporting}
+      >
+        Download Back PNG
+      </button>
+      <button
+        className="btn primary"
+        onClick={downloadPDF}
+        disabled={isExporting}
+      >
+        Download PDF
+      </button>
+      <button
+        className="btn dark"
+        onClick={() => window.print()}
+        disabled={isExporting}
+      >
+        Print
+      </button>
     </div>
   );
 }

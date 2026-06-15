@@ -23,7 +23,6 @@ function Navbar() {
         <NavLink to="/builder">Builder</NavLink>
         <NavLink to="/generate">Generate</NavLink>
         <NavLink to="/cards">Saved Cards</NavLink>
-        <NavLink to="/settings">Settings</NavLink>
       </div>
 
       <div className="nav-actions">

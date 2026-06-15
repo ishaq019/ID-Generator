@@ -1,21 +1,18 @@
 const Template = require("../models/Template");
 const GeneratedCard = require("../models/GeneratedCard");
-const { sendIdCardSubmissionEmail } = require("../utils/emailService");
 const { uploadBufferToDrive } = require("../utils/googleDriveStorage");
 const { removeBackgroundFromUpload } = require("../utils/backgroundRemoval");
-const { getAppSettings } = require("../utils/settingsService");
-
-// const getDigivalTemplateSlug = () => {
-//   return process.env.DIGIVAL_TEMPLATE_SLUG || "digival-employee-id-card";
-// };
-
-
-
-const DIGIVAL_ADDRESS =
-  "5th Floor Right Wing, Chennai Citi Centre,\nDr Radhakrishnan Salai, Mylapore,\nChennai - 600004, Tamil Nadu, India";
+const { getRuntimeAppConfig } = require("../utils/appConfig");
 
 const FIELD_ALIASES = {
-  name: ["name", "employeeName", "fullName", "Name", "Employee Name", "Full Name"],
+  name: [
+    "name",
+    "employeeName",
+    "fullName",
+    "Name",
+    "Employee Name",
+    "Full Name",
+  ],
   employeeId: [
     "employeeId",
     "employeeID",
@@ -25,7 +22,7 @@ const FIELD_ALIASES = {
     "idNumber",
     "Employee ID",
     "Emp ID",
-    "ID Number"
+    "ID Number",
   ],
   bloodGroup: ["bloodGroup", "blood_group", "Blood Group", "Bloodgroup"],
   phone: [
@@ -37,37 +34,46 @@ const FIELD_ALIASES = {
     "Phone",
     "Phone Number",
     "Mobile Number",
-    "Contact Number"
+    "Contact Number",
   ],
   email: ["email", "emailAddress", "Email", "Email Address"],
   photoBase64: [
     "photoBase64",
-    "photoDataUrl",
-    "photoDataURL",
+    "photo_base64",
     "imageBase64",
+    "image_base64",
     "Photo Base64",
-    "Photo Data URL"
+    "Image Base64",
   ],
-  photoMimeType: ["photoMimeType", "mimeType", "Photo MIME Type"],
+  photoMimeType: [
+    "photoMimeType",
+    "photo_mime_type",
+    "mimeType",
+    "mime_type",
+    "Photo Mime Type",
+    "Image Mime Type",
+  ],
   submissionId: [
     "submissionId",
     "googleSubmissionId",
     "responseId",
     "rowNumber",
     "Timestamp",
-    "timestamp"
-  ]
+    "timestamp",
+  ],
 };
 
-const isValidEmail = email => {
+const isValidEmail = (email) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
-const normalizeLookupKey = key => {
-  return String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const normalizeLookupKey = (key) => {
+  return String(key || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 };
 
-const normalizeScalar = value => {
+const normalizeScalar = (value) => {
   if (Array.isArray(value)) {
     return normalizeScalar(value[0]);
   }
@@ -89,7 +95,7 @@ const getValueFromSource = (source, aliases) => {
   }
 
   const normalizedKeyMap = new Map(
-    Object.keys(source).map(key => [normalizeLookupKey(key), key])
+    Object.keys(source).map((key) => [normalizeLookupKey(key), key]),
   );
 
   for (const alias of aliases) {
@@ -116,7 +122,7 @@ const getBodyValue = (body, key) => {
   return "";
 };
 
-const normalizeGoogleFormPayload = body => {
+const normalizeGoogleFormPayload = (body) => {
   return {
     name: getBodyValue(body, "name"),
     employeeId: getBodyValue(body, "employeeId"),
@@ -124,46 +130,67 @@ const normalizeGoogleFormPayload = body => {
     phone: getBodyValue(body, "phone"),
     email: getBodyValue(body, "email").toLowerCase(),
     photoBase64: getBodyValue(body, "photoBase64"),
-    photoMimeType: getBodyValue(body, "photoMimeType") || "image/png",
-    submissionId: getBodyValue(body, "submissionId")
+    photoMimeType: getBodyValue(body, "photoMimeType"),
+    submissionId: getBodyValue(body, "submissionId"),
   };
 };
 
-const getPhotoExtension = mimeType => {
+const getPhotoExtension = (mimeType) => {
   const extensions = {
     "image/jpeg": "jpg",
     "image/jpg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
-    "image/gif": "gif"
+    "image/gif": "gif",
   };
 
   return extensions[String(mimeType || "").toLowerCase()] || "png";
 };
 
-const buildGoogleFormPhotoFile = payload => {
-  let photoMimeType = payload.photoMimeType || "image/png";
-  let photoBase64 = String(payload.photoBase64 || "").trim();
+const stripBase64Prefix = value => {
+  return String(value || "")
+    .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "")
+    .replace(/\s/g, "");
+};
 
-  const dataUrlMatch = photoBase64.match(/^data:(image\/[\w.+-]+);base64,(.+)$/is);
+const buildGoogleFormPhotoFile = (payload, appConfig) => {
+  const photoMimeType = String(payload.photoMimeType || "image/png")
+    .trim()
+    .toLowerCase();
 
-  if (dataUrlMatch) {
-    photoMimeType = dataUrlMatch[1];
-    photoBase64 = dataUrlMatch[2];
-  }
-
-  if (!String(photoMimeType).toLowerCase().startsWith("image/")) {
+  if (!photoMimeType.startsWith("image/")) {
     const error = new Error("Google Form photo must be an image");
     error.statusCode = 400;
     throw error;
   }
 
-  const cleanBase64 = photoBase64.replace(/\s/g, "");
-  const buffer = Buffer.from(cleanBase64, "base64");
+  const photoBase64 = stripBase64Prefix(payload.photoBase64);
+
+  if (!photoBase64 || !/^[a-zA-Z0-9+/=]+$/.test(photoBase64)) {
+    const error = new Error("Google Form photoBase64 is invalid");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const estimatedBytes = Math.floor((photoBase64.length * 3) / 4);
+
+  if (estimatedBytes > appConfig.googleFormPhotoMaxBytes) {
+    const error = new Error("Google Form photo file is too large");
+    error.statusCode = 413;
+    throw error;
+  }
+
+  const buffer = Buffer.from(photoBase64, "base64");
 
   if (!buffer.length) {
-    const error = new Error("Google Form photo could not be decoded");
+    const error = new Error("Google Form photo file is empty");
     error.statusCode = 400;
+    throw error;
+  }
+
+  if (buffer.length > appConfig.googleFormPhotoMaxBytes) {
+    const error = new Error("Google Form photo file is too large");
+    error.statusCode = 413;
     throw error;
   }
 
@@ -177,48 +204,33 @@ const buildGoogleFormPhotoFile = payload => {
     originalname: `${safeEmployeeId || "employee"}-photo.${extension}`,
     mimetype: photoMimeType,
     size: buffer.length,
-    buffer
+    buffer,
   };
 };
 
-const getMissingFields = payload => {
+const getMissingFields = (payload) => {
   return [
     ["name", payload.name],
     ["employeeId", payload.employeeId],
     ["bloodGroup", payload.bloodGroup],
     ["phone", payload.phone],
     ["email", payload.email],
-    ["photoBase64", payload.photoBase64]
+    ["photoBase64", payload.photoBase64],
   ]
     .filter(([, value]) => !value)
     .map(([field]) => field);
 };
 
-const sendConfirmationForExistingCard = async card => {
-  await sendIdCardSubmissionEmail({
-    to: card.recipientEmail,
-    employeeName: card.formData?.name || "Employee"
-  });
-
-  card.emailStatus = "sent";
-  card.emailSentAt = new Date();
-  card.emailError = "";
-  await card.save();
-
-  return card;
-};
-
 exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
   try {
-    const settings = await getAppSettings();
+    const appConfig = await getRuntimeAppConfig();
 
-    const expectedWebhookSecret =
-      settings.googleFormWebhookSecret || process.env.WEBHOOK_SECRET;
+    const expectedWebhookSecret = appConfig.googleFormWebhookSecret;
 
     if (!expectedWebhookSecret) {
       return res.status(500).json({
         message:
-          "Google Form webhook secret is not configured. Add it in Settings or WEBHOOK_SECRET env."
+          "Google Form webhook secret is not configured. Add WEBHOOK_SECRET in MongoDB settings or env.",
       });
     }
 
@@ -234,99 +246,76 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
     if (missingFields.length > 0) {
       return res.status(400).json({
         message: "Missing required Google Form fields",
-        missingFields
+        missingFields,
       });
     }
 
     if (!isValidEmail(payload.email)) {
       return res.status(400).json({
-        message: "Invalid email address"
+        message: "Invalid email address",
       });
     }
 
     const existingCard = payload.submissionId
-      ? await GeneratedCard.findOne({ googleSubmissionId: payload.submissionId })
+      ? await GeneratedCard.findOne({
+          googleSubmissionId: payload.submissionId,
+        })
       : null;
 
     if (existingCard) {
-      if (["pending", "failed"].includes(existingCard.emailStatus)) {
-        try {
-          const emailedCard = await sendConfirmationForExistingCard(existingCard);
-
-          return res.status(200).json({
-            message:
-              "This Google Form submission was already saved; confirmation email was resent successfully",
-            card: emailedCard
-          });
-        } catch (emailError) {
-          existingCard.emailStatus = "failed";
-          existingCard.emailError = emailError.message;
-          await existingCard.save();
-
-          return res.status(502).json({
-            message:
-              "This Google Form submission was already saved, but confirmation email retry failed",
-            error: emailError.message,
-            card: existingCard
-          });
-        }
-      }
-
       return res.status(200).json({
         message: "This Google Form submission was already processed",
-        card: existingCard
+        card: existingCard,
       });
     }
 
-    const templateSlug =
-      settings.digivalTemplateSlug ||
-      process.env.DIGIVAL_TEMPLATE_SLUG ||
-      "digival-employee-id-card";
+    const templateSlug = appConfig.digivalTemplateSlug;
     const template =
       (await Template.findOne({ slug: templateSlug })) ||
       (await Template.findOne({ layoutKey: "digival" }));
 
     if (!template) {
       return res.status(404).json({
-        message: "DigiVal template not found"
+        message: "DigiVal template not found",
       });
     }
 
     let uploadedPhoto;
 
     try {
-      const originalPhotoFile = buildGoogleFormPhotoFile(payload);
+      const originalPhotoFile = buildGoogleFormPhotoFile(
+        payload,
+        appConfig
+      );
 
       const safeEmployeeId = String(payload.employeeId || "employee")
         .replace(/[^\w.-]+/g, "-")
         .replace(/^-+|-+$/g, "");
       const stablePhotoName = `${safeEmployeeId || "employee"}-photo.png`;
       const shouldRemoveBg =
-        settings.backgroundRemovalEnabled !== false &&
-        settings.googleFormRemoveBg !== false &&
-        process.env.GOOGLE_FORM_REMOVE_BG !== "false";
+        appConfig.backgroundRemovalEnabled !== false &&
+        appConfig.googleFormRemoveBg !== false;
 
       const photoFile = shouldRemoveBg
         ? await removeBackgroundFromUpload(originalPhotoFile, {
             fileName: stablePhotoName,
-            model: settings.bgRemovalModel,
-            maxDimension: settings.bgRemovalMaxDimension
+            model: appConfig.bgRemovalModel,
+            maxDimension: appConfig.bgRemovalMaxDimension,
           })
         : {
             ...originalPhotoFile,
             driveFileName: stablePhotoName,
-            originalname: stablePhotoName
+            originalname: stablePhotoName,
           };
 
       uploadedPhoto = await uploadBufferToDrive(photoFile, {
         fileName: stablePhotoName,
-        replaceExisting: true
+        replaceExisting: true,
       });
-
     } catch (uploadError) {
       return res.status(uploadError.statusCode || 502).json({
-        message: "Google Form photo could not be saved to Google Drive",
-        error: uploadError.message
+        message: "Google Form photo could not be read or saved to Google Drive",
+        error: uploadError.message,
       });
     }
 
@@ -336,10 +325,10 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       bloodGroup: payload.bloodGroup,
       phone: payload.phone,
       email: payload.email,
-      address: settings.companyAddress || DIGIVAL_ADDRESS,
-      website: settings.companyWebsite || "www.digi-val.com",
+      address: appConfig.companyAddress,
+      website: appConfig.companyWebsite,
       photo: uploadedPhoto.imageUrl,
-      photoDriveFileId: uploadedPhoto.fileId
+      photoDriveFileId: uploadedPhoto.fileId,
     };
 
     const card = await GeneratedCard.create({
@@ -347,48 +336,16 @@ exports.createDigivalCardFromGoogleForm = async (req, res, next) => {
       formData,
       photo: uploadedPhoto.imageUrl,
       qrData: "STATIC_DIGIVAL_QR",
-
-      // No image attachment generation now.
-      generatedFrontImage: "",
-      generatedBackImage: "",
-      generatedFrontFileUrl: "",
-      generatedBackFileUrl: "",
-
-      recipientEmail: payload.email,
-      emailStatus: "pending",
       source: "google-form",
       googleSubmissionId: payload.submissionId || "",
       uploadsPersisted: true,
-      templateSnapshot: template.toObject()
+      templateSnapshot: template.toObject(),
     });
-
-    try {
-      await sendIdCardSubmissionEmail({
-        to: payload.email,
-        employeeName: payload.name
-      });
-
-      card.emailStatus = "sent";
-      card.emailSentAt = new Date();
-      card.emailError = "";
-      await card.save();
-    } catch (emailError) {
-      card.emailStatus = "failed";
-      card.emailError = emailError.message;
-      await card.save();
-
-      return res.status(502).json({
-        message:
-          "Google Form data was saved and ID card is available on website, but confirmation email sending failed",
-        error: emailError.message,
-        card
-      });
-    }
 
     res.status(201).json({
       message:
-        "Google Form data saved successfully. ID card is available on website and confirmation email sent.",
-      card
+        "Google Form data saved successfully. ID card is available on website.",
+      card,
     });
   } catch (error) {
     next(error);

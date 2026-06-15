@@ -12,8 +12,7 @@ A professional MERN Stack ID Card Generator for office, university, event, and i
 - QR code support
 - Single save action for generated cards in MongoDB
 - Google Form webhook for DigiVal ID card generation
-- Sharp-generated DigiVal front/back PNG images
-- Email delivery with Nodemailer
+- Single Mongo-backed admin login
 - Export as PNG
 - Export as PDF
 - Print cards
@@ -47,27 +46,45 @@ Backend URL:
 http://localhost:5000
 ```
 
-Required backend environment variables:
+Backend environment fallbacks:
 
 ```txt
 MONGO_URI=your MongoDB connection string
+AUTH_SECRET=a long random secret used to sign admin auth tokens
 WEBHOOK_SECRET=a long random secret used by Apps Script
-APP_BASE_URL=https://id-generator-backend-jet.vercel.app
-EMAIL_USER=your Gmail address
-EMAIL_PASS=your Gmail app password
 CLIENT_URL=http://localhost:5175
+CLIENT_URLS=http://localhost:5173,http://localhost:5175
 ```
 
-Required backend environment variables:
+The backend reads app settings from MongoDB first, then falls back to `.env` values field by field.
 
-```txt
-MONGO_URI=your MongoDB connection string
-WEBHOOK_SECRET=the same secret you put in Apps Script
-APP_BASE_URL=https://id-generator-backend-jet.vercel.app
-EMAIL_USER=your Gmail address
-EMAIL_PASS=your Gmail app password
-CLIENT_URL=http://localhost:5175
+Create one admin document in MongoDB's `static_auth` collection:
+
+```json
+{
+  "key": "admin-signin",
+  "username": "admin",
+  "password": "Admin@123"
+}
 ```
+
+Create one config document in MongoDB's `settings` collection:
+
+```json
+{
+  "key": "app-settings",
+  "AUTH_SECRET": "a long random secret used to sign admin auth tokens",
+  "CLIENT_URL": "http://localhost:5175",
+  "WEBHOOK_SECRET": "a long random secret used by Apps Script",
+  "GOOGLE_DRIVE_FOLDER_ID": "your Drive folder ID",
+  "GOOGLE_DRIVE_CLIENT_ID": "your OAuth client ID",
+  "GOOGLE_DRIVE_CLIENT_SECRET": "your OAuth client secret",
+  "GOOGLE_DRIVE_REDIRECT_URI": "https://developers.google.com/oauthplayground",
+  "GOOGLE_DRIVE_REFRESH_TOKEN": "your OAuth refresh token"
+}
+```
+
+There is no frontend admin creation flow and no backend setup route.
 
 Hosted Google Form webhook endpoint:
 
@@ -99,10 +116,10 @@ Frontend URL:
 http://localhost:5175
 ```
 
-The frontend reads `VITE_API_BASE_URL`. If it is not set, it uses:
+The frontend reads `VITE_API_BASE_URL`. If it is not set, it uses the local backend:
 
 ```txt
-https://id-generator-backend-jet.vercel.app/api
+http://localhost:5000/api
 ```
 
 ## Google Form to ID Card Flow
@@ -115,9 +132,9 @@ Google Form
 -> Apps Script
 -> POST /api/google-form/digival-card
 -> MERN backend
--> Sharp generates DigiVal front/back PNG
+-> backend decodes the base64 photo and removes background
+-> processed photo is saved to Google Drive
 -> card data is saved in MongoDB
--> front/back PNGs are emailed to the submitted email address
 ```
 
 The Google Form should collect these fields:
@@ -165,7 +182,9 @@ BACKEND_URL=https://id-generator-backend-jet.vercel.app/api/google-form/digival-
 9. Choose deployment: `Head`.
 10. Choose event source: `From spreadsheet`.
 11. Choose event type: `On form submit`.
-12. Save, authorize Google Drive and external request permissions, then submit a test response.
+12. Save, authorize the requested Apps Script permissions, then submit a test response.
+
+The Apps Script reads the uploaded photo and sends it as base64. The backend removes the background, uploads the processed image to Google Drive, and stores the final card in MongoDB.
 
 After a test submission, check:
 
@@ -173,7 +192,6 @@ After a test submission, check:
 Apps Script -> Executions
 Vercel -> backend logs
 MongoDB -> generatedcards collection
-Recipient inbox -> DigiVal ID card email attachments
 Frontend -> Saved Cards -> DigiVal Cards
 ```
 
@@ -182,10 +200,6 @@ For frontend deployments, set:
 ```txt
 VITE_API_BASE_URL=https://id-generator-backend-jet.vercel.app/api
 ```
-
-## Vercel File Storage Note
-
-The backend writes generated photos/cards into `backend/uploads` when the filesystem allows it. Vercel serverless storage is not reliable as permanent file storage, so the Google Form flow also stores the generated PNGs as data URLs in MongoDB and emails the PNG buffers directly. For a larger production setup, move generated assets to Cloudinary, S3, or another persistent object store.
 
 ## Folder Structure
 
@@ -212,5 +226,4 @@ frontend/
 
 - MongoDB must be running locally or through MongoDB Atlas.
 - Default templates are automatically seeded when the backend starts.
-- Uploaded images are stored in `backend/uploads`.
-"# ID-Generator" 
+- Uploaded images are stored in Google Drive and served through `/api/files/:fileId`.

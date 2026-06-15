@@ -10,7 +10,6 @@ import TemplateBuilder from "./pages/TemplateBuilder";
 import GenerateCard from "./pages/GenerateCard";
 import GeneratedCards from "./pages/GeneratedCards";
 import Login from "./pages/Login";
-import Settings from "./pages/Settings";
 
 function AppLayout() {
   return (
@@ -38,7 +37,6 @@ function App() {
           <Route path="/generate" element={<GenerateCard />} />
           <Route path="/generate/:templateId" element={<GenerateCard />} />
           <Route path="/cards" element={<GeneratedCards />} />
-          <Route path="/settings" element={<Settings />} />
         </Route>
       </Route>
 

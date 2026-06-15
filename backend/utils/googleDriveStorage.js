@@ -1,7 +1,7 @@
 const { Readable } = require("stream");
 const path = require("path");
 const getGoogleDrive = require("../config/googleDrive");
-const { getAppSettings } = require("./settingsService");
+const { getRuntimeAppConfig } = require("./appConfig");
 
 const sanitizeFileName = fileName => {
   const parsedName = path.basename(String(fileName || "upload"));
@@ -22,9 +22,9 @@ const getDriveFolderId = async options => {
     return options.folderId;
   }
 
-  const settings = await getAppSettings();
+  const appConfig = await getRuntimeAppConfig();
 
-  return settings.googleDriveFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+  return appConfig.googleDriveFolderId;
 };
 
 const normalizeUploadFileName = (file, options = {}) => {
@@ -44,7 +44,7 @@ const normalizeUploadFileName = (file, options = {}) => {
 };
 
 const findDriveFileByName = async (fileName, folderId) => {
-  const drive = getGoogleDrive();
+  const drive = await getGoogleDrive();
 
   const escapedFileName = escapeDriveQueryValue(fileName);
   const escapedFolderId = escapeDriveQueryValue(folderId);
@@ -53,7 +53,7 @@ const findDriveFileByName = async (fileName, folderId) => {
     q: `name = '${escapedFileName}' and '${escapedFolderId}' in parents and trashed = false`,
     fields: "files(id,name,mimeType,size,webViewLink,webContentLink,modifiedTime)",
     spaces: "drive",
-    pageSize: 10,
+    pageSize: 10, 
     supportsAllDrives: true,
     includeItemsFromAllDrives: true
   });
@@ -124,12 +124,12 @@ const uploadBufferToDrive = async (file, options = {}) => {
 
   if (!folderId) {
     throw new Error(
-      "Google Drive folder ID is missing. Add it in Settings or GOOGLE_DRIVE_FOLDER_ID env."
+      "Google Drive folder ID is missing. Add GOOGLE_DRIVE_FOLDER_ID in MongoDB settings or env."
     );
   }
 
   const fileName = normalizeUploadFileName(file, options);
-  const drive = getGoogleDrive();
+  const drive = await getGoogleDrive();
 
   let existingFile = null;
 
@@ -176,14 +176,21 @@ const streamToBuffer = async stream => {
   return Buffer.concat(chunks);
 };
 
-const downloadDriveFileAsBuffer = async fileId => {
-  const drive = getGoogleDrive();
+const getDriveFileMetadata = async fileId => {
+  const drive = await getGoogleDrive();
 
   const metadataResponse = await drive.files.get({
     fileId,
     fields: "id,name,mimeType,size",
     supportsAllDrives: true
   });
+
+  return metadataResponse.data;
+};
+
+const downloadDriveFileAsBuffer = async (fileId, existingMetadata = null) => {
+  const drive = await getGoogleDrive();
+  const metadata = existingMetadata || (await getDriveFileMetadata(fileId));
 
   const mediaResponse = await drive.files.get(
     {
@@ -200,13 +207,14 @@ const downloadDriveFileAsBuffer = async fileId => {
 
   return {
     buffer,
-    metadata: metadataResponse.data
+    metadata
   };
 };
 
 module.exports = {
   uploadBufferToDrive,
   downloadDriveFileAsBuffer,
+  getDriveFileMetadata,
   findDriveFileByName,
   sanitizeFileName
 };

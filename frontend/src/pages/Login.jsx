@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+const initialFormData = {
+  username: "",
+  password: "",
+};
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -9,31 +14,27 @@ function Login() {
 
   const redirectPath = location.state?.from?.pathname || "/";
 
-  const [formData, setFormData] = useState({
-    username: "",
-    password: ""
-  });
-
+  const [formData, setFormData] = useState(initialFormData);
   const [status, setStatus] = useState({
     loading: false,
-    error: ""
+    error: "",
   });
 
-  const handleChange = event => {
+  const handleChange = (event) => {
     const { name, value } = event.target;
 
-    setFormData(previous => ({
-      ...previous,
-      [name]: value
+    setFormData((previousData) => ({
+      ...previousData,
+      [name]: value,
     }));
   };
 
-  const handleSubmit = async event => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     setStatus({
       loading: true,
-      error: ""
+      error: "",
     });
 
     try {
@@ -42,7 +43,8 @@ function Login() {
     } catch (error) {
       setStatus({
         loading: false,
-        error: error?.response?.data?.message || "Login failed. Please try again."
+        error:
+          error?.response?.data?.message || "Login failed. Please try again.",
       });
     }
   };
@@ -87,14 +89,14 @@ function Login() {
 
           {status.error && <div className="auth-error">{status.error}</div>}
 
-          <button className="btn primary auth-submit" type="submit" disabled={status.loading}>
-            {status.loading ? "Checking..." : "Login"}
+          <button
+            className="btn primary auth-submit"
+            type="submit"
+            disabled={status.loading}
+          >
+            {status.loading ? "Logging in..." : "Login"}
           </button>
         </form>
-
-        <p className="auth-note">
-          Default login: username <b>admin</b>, password <b>Admin@123</b>.
-        </p>
       </div>
     </section>
   );

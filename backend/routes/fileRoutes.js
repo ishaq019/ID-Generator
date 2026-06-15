@@ -10,19 +10,18 @@ router.get("/:fileId", async (req, res) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(fileId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid file ID"
+        message: "Invalid file ID",
       });
     }
 
     const { buffer, metadata } = await downloadDriveFileAsBuffer(fileId);
 
-
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    res.setHeader("Content-Type", metadata.mimeType || "application/octet-stream");
+    res.setHeader(
+      "Content-Type",
+      metadata.mimeType || "application/octet-stream",
+    );
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.setHeader("Content-Length", buffer.length);
 
@@ -30,7 +29,7 @@ router.get("/:fileId", async (req, res) => {
   } catch (error) {
     res.status(404).json({
       success: false,
-      message: error.message || "Image not found"
+      message: error.message || "Image not found",
     });
   }
 });

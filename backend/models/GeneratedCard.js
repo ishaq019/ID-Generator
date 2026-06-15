@@ -5,51 +5,37 @@ const generatedCardSchema = new mongoose.Schema(
     templateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Template",
-      required: true
+      required: true,
     },
 
     formData: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
+      default: {},
     },
 
     photo: { type: String, default: "" },
     logo: { type: String, default: "" },
     qrData: { type: String, default: "" },
 
-    generatedFrontImage: { type: String, default: "" },
-    generatedBackImage: { type: String, default: "" },
-    generatedFrontFileUrl: { type: String, default: "" },
-    generatedBackFileUrl: { type: String, default: "" },
-
-    recipientEmail: { type: String, default: "" },
-    emailStatus: {
-      type: String,
-      enum: ["not-required", "pending", "sent", "failed"],
-      default: "not-required"
-    },
-    emailSentAt: { type: Date },
-    emailError: { type: String, default: "" },
-
     source: {
       type: String,
       enum: ["manual", "google-form"],
-      default: "manual"
+      default: "manual",
     },
 
     googleSubmissionId: {
       type: String,
       default: "",
-      index: true
+      index: true,
     },
     uploadsPersisted: { type: Boolean, default: false },
 
     templateSnapshot: {
       type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
+      default: {},
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports =

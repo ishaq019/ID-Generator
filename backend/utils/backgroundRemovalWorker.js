@@ -2,12 +2,16 @@ const fs = require("fs/promises");
 const path = require("path");
 const { pathToFileURL } = require("url");
 
-const BG_REMOVAL_PACKAGE_ENTRY = require.resolve("@imgly/background-removal-node");
+const BG_REMOVAL_PACKAGE_ENTRY = require.resolve(
+  "@imgly/background-removal-node",
+);
 const BG_REMOVAL_ASSET_DIR = path.dirname(BG_REMOVAL_PACKAGE_ENTRY);
 
 // Keep this worker on the remover package's sharp/libvips version. Loading it
 // in a separate process avoids native sharp conflicts with the rest of the app.
-const sharp = require(path.resolve(BG_REMOVAL_ASSET_DIR, "../node_modules/sharp"));
+const sharp = require(
+  path.resolve(BG_REMOVAL_ASSET_DIR, "../node_modules/sharp"),
+);
 
 const loadRemoveBackground = async () => {
   const moduleData = await import("@imgly/background-removal-node");
@@ -24,7 +28,7 @@ const loadRemoveBackground = async () => {
   return removeBackground;
 };
 
-const resultToBuffer = async result => {
+const resultToBuffer = async (result) => {
   if (Buffer.isBuffer(result)) return result;
 
   if (result instanceof Uint8Array) {
@@ -55,56 +59,37 @@ const run = async () => {
       width: request.maxDimension,
       height: request.maxDimension,
       fit: "inside",
-      withoutEnlargement: true
+      withoutEnlargement: true,
     })
     .png()
     .toFile(normalizedInputPath);
 
-  const metadataBefore = await sharp(normalizedInputPath).metadata();
   const removeBackground = await loadRemoveBackground();
-  const removedResult = await removeBackground(pathToFileURL(normalizedInputPath).href, {
-    publicPath: request.publicPath,
-    model: request.model,
-    output: {
-      format: "image/png",
-      quality: 0.95
+  const removedResult = await removeBackground(
+    pathToFileURL(normalizedInputPath).href,
+    {
+      publicPath: request.publicPath,
+      model: request.model,
+      output: {
+        format: "image/png",
+        quality: 0.95,
+      },
+      debug: false,
     },
-    debug: false
-  });
+  );
 
   const removedBuffer = await resultToBuffer(removedResult);
   const finalPngBuffer = await sharp(removedBuffer, { failOn: "none" })
     .png({
       compressionLevel: 9,
-      adaptiveFiltering: true
+      adaptiveFiltering: true,
     })
     .toBuffer();
 
-  const metadataAfter = await sharp(finalPngBuffer).metadata();
-
   await fs.writeFile(request.outputPath, finalPngBuffer);
-  await fs.writeFile(
-    request.resultPath,
-    JSON.stringify({
-      normalized: {
-        path: normalizedInputPath,
-        format: metadataBefore.format,
-        width: metadataBefore.width,
-        height: metadataBefore.height,
-        size: (await fs.stat(normalizedInputPath)).size
-      },
-      output: {
-        format: metadataAfter.format,
-        width: metadataAfter.width,
-        height: metadataAfter.height,
-        hasAlpha: metadataAfter.hasAlpha,
-        size: finalPngBuffer.length
-      }
-    })
-  );
 };
 
-run().catch(error => {
+run().catch((error) => {
   console.error(error.stack || error.message || error);
   process.exit(1);
 });

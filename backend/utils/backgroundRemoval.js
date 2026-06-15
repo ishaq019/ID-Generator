@@ -4,31 +4,38 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { pathToFileURL } = require("url");
 
-const BG_REMOVAL_PACKAGE_ENTRY = require.resolve("@imgly/background-removal-node");
+const BG_REMOVAL_PACKAGE_ENTRY = require.resolve(
+  "@imgly/background-removal-node",
+);
 const BG_REMOVAL_ASSET_DIR = path.dirname(BG_REMOVAL_PACKAGE_ENTRY);
-const BG_REMOVAL_WORKER_PATH = path.join(__dirname, "backgroundRemovalWorker.js");
+const BG_REMOVAL_WORKER_PATH = path.join(
+  __dirname,
+  "backgroundRemovalWorker.js",
+);
 
 const SUPPORTED_MODELS = new Set(["small", "medium"]);
 const DEFAULT_MAX_DIMENSION = 1024;
 
-const toDirectoryFileUrl = directoryPath => {
+const toDirectoryFileUrl = (directoryPath) => {
   const href = pathToFileURL(directoryPath).href;
   return href.endsWith("/") ? href : `${href}/`;
 };
 
 const BG_REMOVAL_PUBLIC_PATH = toDirectoryFileUrl(BG_REMOVAL_ASSET_DIR);
 
-const normalizePublicPath = value => {
+const normalizePublicPath = (value) => {
   const publicPath = String(value || BG_REMOVAL_PUBLIC_PATH).trim();
   return publicPath.endsWith("/") ? publicPath : `${publicPath}/`;
 };
 
-const getSafeModel = value => {
-  const model = String(value || "small").trim().toLowerCase();
+const getSafeModel = (value) => {
+  const model = String(value || "small")
+    .trim()
+    .toLowerCase();
   return SUPPORTED_MODELS.has(model) ? model : "small";
 };
 
-const getSafeDimension = value => {
+const getSafeDimension = (value) => {
   const dimension = Number(value || DEFAULT_MAX_DIMENSION);
 
   if (!Number.isFinite(dimension)) {
@@ -38,33 +45,40 @@ const getSafeDimension = value => {
   return Math.min(Math.max(Math.round(dimension), 256), 2048);
 };
 
-const buildPngFileName = originalName => {
+const buildPngFileName = (originalName) => {
   const baseName =
     path
-      .basename(String(originalName || "photo"), path.extname(String(originalName || "photo")))
+      .basename(
+        String(originalName || "photo"),
+        path.extname(String(originalName || "photo")),
+      )
       .replace(/[^\w.-]+/g, "-")
       .replace(/^-+|-+$/g, "") || "photo";
 
   return `${baseName}.png`;
 };
 
-const runBackgroundRemovalWorker = requestPath => {
+const runBackgroundRemovalWorker = (requestPath) => {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [BG_REMOVAL_WORKER_PATH, requestPath], {
-      cwd: path.resolve(__dirname, ".."),
-      env: process.env,
-      windowsHide: true
-    });
+    const child = spawn(
+      process.execPath,
+      [BG_REMOVAL_WORKER_PATH, requestPath],
+      {
+        cwd: path.resolve(__dirname, ".."),
+        env: process.env,
+        windowsHide: true,
+      },
+    );
 
     const stdoutChunks = [];
     const stderrChunks = [];
 
-    child.stdout.on("data", chunk => stdoutChunks.push(chunk));
-    child.stderr.on("data", chunk => stderrChunks.push(chunk));
+    child.stdout.on("data", (chunk) => stdoutChunks.push(chunk));
+    child.stderr.on("data", (chunk) => stderrChunks.push(chunk));
 
     child.on("error", reject);
 
-    child.on("close", code => {
+    child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks).toString("utf8").trim();
       const stderr = Buffer.concat(stderrChunks).toString("utf8").trim();
 
@@ -77,8 +91,8 @@ const runBackgroundRemovalWorker = requestPath => {
         new Error(
           stderr ||
             stdout ||
-            `Background removal worker exited with status ${code}`
-        )
+            `Background removal worker exited with status ${code}`,
+        ),
       );
     });
   });
@@ -90,70 +104,46 @@ const removeBackgroundFromUpload = async (file, options = {}) => {
   }
 
   const finalFileName = buildPngFileName(
-    options.fileName || file.driveFileName || file.originalname
+    options.fileName || file.driveFileName || file.originalname,
   );
 
   const model = getSafeModel(
-    options.model || process.env.BG_REMOVAL_MODEL || "small"
+    options.model || process.env.BG_REMOVAL_MODEL || "small",
   );
   const maxDimension = getSafeDimension(
-    options.maxDimension || process.env.BG_REMOVAL_MAX_DIMENSION
+    options.maxDimension || process.env.BG_REMOVAL_MAX_DIMENSION,
   );
   const publicPath = normalizePublicPath(
-    options.publicPath || process.env.BG_REMOVAL_PUBLIC_PATH
+    options.publicPath || process.env.BG_REMOVAL_PUBLIC_PATH,
   );
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "id-bg-"));
   const tempInputPath = path.join(tempDir, "input");
   const tempOutputPath = path.join(tempDir, "output.png");
-  const resultPath = path.join(tempDir, "result.json");
   const requestPath = path.join(tempDir, "request.json");
 
   try {
-    console.log("BG REMOVER STARTED:", {
-      fileName: finalFileName,
-      inputType: file.mimetype,
-      inputSize: file.buffer.length,
-      model,
-      maxDimension,
-      publicPath
-    });
-
     fs.writeFileSync(tempInputPath, file.buffer);
-    fs.writeFileSync(requestPath, JSON.stringify({
-      inputPath: tempInputPath,
-      outputPath: tempOutputPath,
-      resultPath,
-      model,
-      maxDimension,
-      publicPath
-    }));
+    fs.writeFileSync(
+      requestPath,
+      JSON.stringify({
+        inputPath: tempInputPath,
+        outputPath: tempOutputPath,
+        model,
+        maxDimension,
+        publicPath,
+      }),
+    );
 
     await runBackgroundRemovalWorker(requestPath);
 
     if (!fs.existsSync(tempOutputPath)) {
-      throw new Error("Background removal worker did not return an output image");
+      throw new Error(
+        "Background removal worker did not return an output image",
+      );
     }
 
     const finalPngBuffer = fs.readFileSync(tempOutputPath);
-    const result = fs.existsSync(resultPath)
-      ? JSON.parse(fs.readFileSync(resultPath, "utf8"))
-      : {};
-
-    console.log("BG REMOVER TEMP FILE READY:", {
-      tempInputPath: result.normalized?.path,
-      format: result.normalized?.format,
-      width: result.normalized?.width,
-      height: result.normalized?.height,
-      size: result.normalized?.size
-    });
-
-    console.log("BG REMOVER COMPLETED:", {
-      fileName: finalFileName,
-      outputSize: finalPngBuffer.length,
-      format: result.output?.format,
-      hasAlpha: result.output?.hasAlpha
-    });
 
     return {
       ...file,
@@ -161,7 +151,7 @@ const removeBackgroundFromUpload = async (file, options = {}) => {
       driveFileName: finalFileName,
       mimetype: "image/png",
       size: finalPngBuffer.length,
-      buffer: finalPngBuffer
+      buffer: finalPngBuffer,
     };
   } finally {
     try {
@@ -179,5 +169,5 @@ const removeBackgroundFromUpload = async (file, options = {}) => {
 };
 
 module.exports = {
-  removeBackgroundFromUpload
+  removeBackgroundFromUpload,
 };

@@ -1,9 +1,7 @@
-const {
-  createAuthToken,
-  validateStaticLogin
-} = require("../config/staticAuth");
+const { createAuthToken } = require("../utils/authTokenService");
+const { validateAdminLogin } = require("../utils/staticAuthService");
 
-const login = (req, res) => {
+const login = async (req, res, next) => {
   const username = String(req.body?.username || "").trim();
   const password = String(req.body?.password || "");
 
@@ -14,26 +12,38 @@ const login = (req, res) => {
     });
   }
 
-  const isValid = validateStaticLogin({ username, password });
+  try {
+    const loginResult = await validateAdminLogin({ username, password });
 
-  if (!isValid) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid username or password"
-    });
-  }
-
-  const token = createAuthToken(username);
-
-  return res.json({
-    success: true,
-    message: "Login successful",
-    token,
-    user: {
-      username,
-      role: "admin"
+    if (!loginResult.isConfigured) {
+      return res.status(503).json({
+        success: false,
+        message:
+          'Admin account is not configured. Add the "admin-signin" document in MongoDB static_auth collection.'
+      });
     }
-  });
+
+    if (!loginResult.isValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid username or password"
+      });
+    }
+
+    const token = await createAuthToken(loginResult.username);
+
+    return res.json({
+      success: true,
+      message: "Login successful",
+      token,
+      user: {
+        username: loginResult.username,
+        role: "admin"
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getProfile = (req, res) => {

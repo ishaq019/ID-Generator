@@ -1,9 +1,26 @@
 import axios from "axios";
 
+const LOCAL_API_BASE_URL = "http://localhost:5000/api";
+const NGROK_API_BASE_URL = "https://accustom-suds-roving.ngrok-free.dev/api";
+
+const shouldUseNgrokBackend =
+  import.meta.env.VITE_USE_NGROK_BACKEND === "true";
+
+const normalizeApiBaseUrl = (value) => {
+  const baseUrl = String(value || "").trim().replace(/\/+$/, "");
+
+  if (!baseUrl) {
+    return LOCAL_API_BASE_URL;
+  }
+
+  return /\/api$/i.test(baseUrl) ? baseUrl : `${baseUrl}/api`;
+};
+
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:5000/api";
-  // "https://id-generator-backend-jet.vercel.app/api";
+  normalizeApiBaseUrl(
+    import.meta.env.VITE_API_BASE_URL ||
+      (shouldUseNgrokBackend ? NGROK_API_BASE_URL : LOCAL_API_BASE_URL),
+  );
 
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
@@ -14,7 +31,7 @@ export const getAuthToken = () => {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 };
 
-export const setAuthToken = token => {
+export const setAuthToken = (token) => {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
 };
 
@@ -32,11 +49,11 @@ export const getStoredAuthUser = () => {
   }
 };
 
-export const setStoredAuthUser = user => {
+export const setStoredAuthUser = (user) => {
   localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 };
 
-export const resolveApiAssetUrl = value => {
+export const resolveApiAssetUrl = (value) => {
   if (!value) return "";
 
   if (/^(data:|blob:|https?:\/\/)/i.test(value)) {
@@ -55,10 +72,10 @@ export const resolveApiAssetUrl = value => {
 };
 
 const api = axios.create({
-  baseURL: API_BASE_URL
+  baseURL: API_BASE_URL,
 });
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
   const token = getAuthToken();
 
   if (token) {
@@ -69,8 +86,8 @@ api.interceptors.request.use(config => {
 });
 
 api.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     if (error?.response?.status === 401) {
       clearAuthToken();
 
@@ -80,42 +97,39 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export const authAPI = {
-  login: data => api.post("/auth/login", data),
-  me: () => api.get("/auth/me")
-};
-
-export const settingsAPI = {
-  get: () => api.get("/settings"),
-  update: data => api.put("/settings", data)
+  login: (data) => api.post("/auth/login", data),
+  me: () => api.get("/auth/me"),
 };
 
 export const templateAPI = {
-  getAll: category =>
-    api.get(`/templates${category && category !== "All" ? `?category=${category}` : ""}`),
+  getAll: (category) =>
+    api.get(
+      `/templates${category && category !== "All" ? `?category=${category}` : ""}`,
+    ),
 
-  getById: id => api.get(`/templates/${id}`),
+  getById: (id) => api.get(`/templates/${id}`),
 
-  create: data => api.post("/templates", data),
+  create: (data) => api.post("/templates", data),
 
   update: (id, data) => api.put(`/templates/${id}`, data),
 
-  delete: id => api.delete(`/templates/${id}`)
+  delete: (id) => api.delete(`/templates/${id}`),
 };
 
 export const cardAPI = {
   getAll: () => api.get("/cards"),
 
-  getById: id => api.get(`/cards/${id}`),
+  getById: (id) => api.get(`/cards/${id}`),
 
-  create: data => api.post("/cards", data),
+  create: (data) => api.post("/cards", data),
 
   update: (id, data) => api.put(`/cards/${id}`, data),
 
-  delete: id => api.delete(`/cards/${id}`)
+  delete: (id) => api.delete(`/cards/${id}`),
 };
 
 export const uploadAPI = {
@@ -131,21 +145,21 @@ export const uploadAPI = {
       formData.append("fileName", options.fileName);
     }
 
-    return api.post("/uploads/photo", formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    }).then(response => {
-      const imageUrl =
-        response.data.imageUrl ||
-        response.data.file?.imageUrl ||
-        "";
+    return api
+      .post("/uploads/photo", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((response) => {
+        const imageUrl =
+          response.data.imageUrl || response.data.file?.imageUrl || "";
 
-      return {
-        ...response,
-        data: {
-          ...response.data,
-          imageUrl: resolveApiAssetUrl(imageUrl)
-        }
-      };
-    });
-  }
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            imageUrl: resolveApiAssetUrl(imageUrl),
+          },
+        };
+      });
+  },
 };

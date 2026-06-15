@@ -1,39 +1,57 @@
 const express = require("express");
-const upload = require("../middleware/uploadMiddleware");
+const multer = require("multer");
+const createUploadMiddleware = require("../middleware/uploadMiddleware");
 const { uploadBufferToDrive } = require("../utils/googleDriveStorage");
 const { removeBackgroundFromUpload } = require("../utils/backgroundRemoval");
-const { getAppSettings } = require("../utils/settingsService");
+const { getRuntimeAppConfig } = require("../utils/appConfig");
 
 const router = express.Router();
 
-const shouldRemoveBackground = value => {
+const shouldRemoveBackground = (value) => {
   return [true, "true", "1", "yes", "on"].includes(value);
 };
 
-const createUploadHandler = fieldName => [
-  upload.single(fieldName),
+const handleUploadMiddleware = fieldName => {
+  const uploadSingle = createUploadMiddleware(fieldName);
 
+  return (req, res, next) => {
+    uploadSingle(req, res, error => {
+      if (!error) {
+        return next();
+      }
+
+      if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({
+          success: false,
+          message: "Image file is too large"
+        });
+      }
+
+      return res.status(error.statusCode || 400).json({
+        success: false,
+        message: error.message || "Invalid image upload"
+      });
+    });
+  };
+};
+
+const createUploadHandler = (fieldName) => [
+  handleUploadMiddleware(fieldName),
   async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({
           success: false,
-          message: `Image file is required in "${fieldName}" field`
+          message: `Image file is required in "${fieldName}" field`,
         });
       }
 
-      const settings = await getAppSettings();
-      const requestedRemoveBg = shouldRemoveBackground(req.body?.removeBackground);
+      const appConfig = await getRuntimeAppConfig();
+      const requestedRemoveBg = shouldRemoveBackground(
+        req.body?.removeBackground,
+      );
       const removeBg =
-        requestedRemoveBg && settings.backgroundRemovalEnabled !== false;
-
-      console.log("UPLOAD RECEIVED:", {
-        fileName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        requestedRemoveBg,
-        removeBg
-      });
+        requestedRemoveBg && appConfig.backgroundRemovalEnabled !== false;
 
       let fileToUpload = req.file;
 
@@ -41,22 +59,22 @@ const createUploadHandler = fieldName => [
         try {
           fileToUpload = await removeBackgroundFromUpload(req.file, {
             fileName: req.body?.fileName || req.file.originalname,
-            model: settings.bgRemovalModel,
-            maxDimension: settings.bgRemovalMaxDimension
+            model: appConfig.bgRemovalModel,
+            maxDimension: appConfig.bgRemovalMaxDimension,
           });
         } catch (bgError) {
           console.error("BACKGROUND REMOVAL FAILED:", bgError);
 
           return res.status(500).json({
             success: false,
-            message: bgError.message || "Background removal failed"
+            message: bgError.message || "Background removal failed",
           });
         }
       }
 
       const uploadedFile = await uploadBufferToDrive(fileToUpload, {
         fileName: fileToUpload.driveFileName || fileToUpload.originalname,
-        replaceExisting: true
+        replaceExisting: true,
       });
 
       const versionedUrl = `${uploadedFile.imageUrl}?v=${Date.now()}`;
@@ -71,18 +89,18 @@ const createUploadHandler = fieldName => [
         fileId: uploadedFile.fileId,
         file: {
           ...uploadedFile,
-          imageUrl: versionedUrl
-        }
+          imageUrl: versionedUrl,
+        },
       });
     } catch (error) {
       console.error("UPLOAD ERROR:", error);
 
       return res.status(500).json({
         success: false,
-        message: error.message || "Image upload failed"
+        message: error.message || "Image upload failed",
       });
     }
-  }
+  },
 ];
 
 router.post("/photo", ...createUploadHandler("photo"));
