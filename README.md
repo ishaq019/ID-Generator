@@ -12,7 +12,7 @@ A professional MERN Stack ID Card Generator for office, university, event, and i
 - QR code support
 - Single save action for generated cards in MongoDB
 - Google Form webhook for DigiVal ID card generation
-- Single Mongo-backed admin login
+- Admin login from env, MongoDB settings, or `static_auth`
 - Export as PNG
 - Export as PDF
 - Print cards
@@ -51,6 +51,8 @@ Backend environment fallbacks:
 ```txt
 MONGO_URI=your MongoDB connection string
 AUTH_SECRET=a long random secret used to sign admin auth tokens
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=a strong admin password
 WEBHOOK_SECRET=a long random secret used by Apps Script
 CLIENT_URL=http://localhost:5175
 CLIENT_URLS=http://localhost:5173,http://localhost:5175
@@ -58,7 +60,9 @@ CLIENT_URLS=http://localhost:5173,http://localhost:5175
 
 The backend reads app settings from MongoDB first, then falls back to `.env` values field by field.
 
-Create one admin document in MongoDB's `static_auth` collection:
+Easy admin setup: set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in `.env` or in the MongoDB `settings` document.
+
+Optional fallback: create one admin document in MongoDB's `static_auth` collection:
 
 ```json
 {
@@ -74,6 +78,8 @@ Create one config document in MongoDB's `settings` collection:
 {
   "key": "app-settings",
   "AUTH_SECRET": "a long random secret used to sign admin auth tokens",
+  "ADMIN_USERNAME": "admin",
+  "ADMIN_PASSWORD": "a strong admin password",
   "CLIENT_URL": "http://localhost:5175",
   "WEBHOOK_SECRET": "a long random secret used by Apps Script",
   "GOOGLE_DRIVE_FOLDER_ID": "your Drive folder ID",
