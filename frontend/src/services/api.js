@@ -1,10 +1,6 @@
 import axios from "axios";
 
 const LOCAL_API_BASE_URL = "http://localhost:5000/api";
-const NGROK_API_BASE_URL = "https://accustom-suds-roving.ngrok-free.dev/api";
-
-const shouldUseNgrokBackend =
-  import.meta.env.VITE_USE_NGROK_BACKEND === "true";
 
 const normalizeApiBaseUrl = (value) => {
   const baseUrl = String(value || "").trim().replace(/\/+$/, "");
@@ -17,10 +13,7 @@ const normalizeApiBaseUrl = (value) => {
 };
 
 const API_BASE_URL =
-  normalizeApiBaseUrl(
-    import.meta.env.VITE_API_BASE_URL ||
-      (shouldUseNgrokBackend ? NGROK_API_BASE_URL : LOCAL_API_BASE_URL),
-  );
+  normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL || LOCAL_API_BASE_URL);
 
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
