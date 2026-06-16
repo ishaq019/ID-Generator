@@ -161,9 +161,11 @@ The DigiVal automation flow:
 ```txt
 Google Form
 -> linked Google Sheet
--> Apps Script reads submitted fields and uploaded photo
--> Apps Script sends JSON + base64 photo to backend webhook
+-> Apps Script reads submitted fields and uploaded photo Drive file ID
+-> Apps Script can grant backend Drive account read access to the source file
+-> Apps Script sends JSON + photoFileId to backend webhook
 -> backend validates webhook secret
+-> backend downloads source photo from Google Drive
 -> backend uploads processed photo to Google Drive
 -> backend saves generated card in MongoDB
 ```
@@ -396,7 +398,8 @@ Apps Script sends webhook
 -> backend validates required fields and email format
 -> backend prevents duplicate submissionId
 -> backend finds DigiVal template
--> backend decodes base64 photo
+-> backend reads photoFileId or legacy photoBase64
+-> backend downloads Drive photo or decodes legacy base64 photo
 -> optional background removal
 -> upload photo to Google Drive
 -> create GeneratedCard with source google-form
@@ -797,7 +800,8 @@ Code logic:
 - Validates email format.
 - Prevents duplicate processing by `submissionId`.
 - Finds DigiVal template by slug or layout key.
-- Decodes base64 photo.
+- Reads `photoFileId` or legacy `photoBase64`.
+- Downloads Drive photo or decodes legacy base64 photo.
 - Checks photo MIME type and size.
 - Optionally removes background.
 - Uploads photo to Drive.
@@ -825,8 +829,7 @@ Code logic:
 
 - Runs on Google Sheet form submit trigger.
 - Reads configured form field titles.
-- Reads uploaded photo file.
-- Converts photo bytes to base64.
+- Extracts uploaded photo Drive file ID from the response sheet.
 - Sends POST request to backend webhook.
 
 Business logic:
@@ -1201,7 +1204,7 @@ The app does not store large images inside MongoDB. Images are uploaded to Googl
 
 ### Google Form Explanation
 
-The Google Form flow is an automation path for DigiVal cards. Apps Script sends form data and a base64 photo to the backend webhook. The backend validates the secret, normalizes fields, processes the photo, uploads it to Drive, and creates a generated card in MongoDB.
+The Google Form flow is an automation path for DigiVal cards. Apps Script sends form data and the uploaded photo's Drive file ID to the backend webhook. The backend validates the secret, normalizes fields, downloads and processes the photo, uploads it to Drive, and creates a generated card in MongoDB. Legacy `photoBase64` payloads are still accepted as a fallback.
 
 ### Export Explanation
 

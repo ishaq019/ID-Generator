@@ -41,6 +41,16 @@ The backend reads app config from MongoDB first. These `.env` values are fallbac
 
 For Google Drive uploads, generate the refresh token from the same Google account that owns or can edit the target Drive folder. Enable the Google Drive API in the Google Cloud project that owns the OAuth client. Service-account credentials are still supported as a fallback through `GOOGLE_CLIENT_EMAIL` and `GOOGLE_PRIVATE_KEY`.
 
+If Google Drive calls fail with `invalid_grant`, the backend OAuth refresh token is no longer valid. Regenerate `GOOGLE_DRIVE_REFRESH_TOKEN` with the same `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, and redirect URI, then update the MongoDB `settings` document or `.env` and redeploy/restart the backend. For Google Cloud OAuth consent screens in Testing mode, refresh tokens can expire; move the app to Production or regenerate the token when needed.
+
+You can verify what the backend resolves from MongoDB without printing secrets:
+
+```bash
+npm run check:drive-config
+```
+
+This prints detected Mongo keys, masked credential fingerprints, and whether Google accepts the configured refresh token.
+
 Optional app behavior can be configured with `DIGIVAL_TEMPLATE_SLUG`, `COMPANY_WEBSITE`, `COMPANY_ADDRESS`, `BACKGROUND_REMOVAL_ENABLED`, `GOOGLE_FORM_REMOVE_BG`, `BG_REMOVAL_MODEL`, `BG_REMOVAL_MAX_DIMENSION`, and `GOOGLE_FORM_PHOTO_MAX_SIZE`.
 
 ## MongoDB Config
@@ -114,19 +124,28 @@ Required JSON fields:
   "bloodGroup": "O+",
   "phone": "9876543210",
   "email": "employee@example.com",
-  "photoBase64": "base64 encoded image bytes from Apps Script",
-  "photoMimeType": "image/png",
+  "photoFileId": "google drive file id from the Form upload cell",
   "submissionId": "unique google sheet row id"
 }
 ```
 
-The Apps Script reads the Google Form upload, sends the image bytes as base64, and the backend removes the background before uploading the processed image to Google Drive. The backend Google Drive credentials only need access to the output folder configured by `GOOGLE_DRIVE_FOLDER_ID`.
+The Apps Script runs from the linked Google Sheet, reads the submitted row, extracts the uploaded image's Drive file ID, and sends `photoFileId` to the backend. The backend downloads that file, removes the background when enabled, and uploads the processed image to the output folder configured by `GOOGLE_DRIVE_FOLDER_ID`. Legacy `photoBase64` plus `photoMimeType` payloads are still accepted as a fallback.
+
+The backend Google Drive credentials must be able to read the Form-uploaded source file and write to the output folder. Use OAuth credentials for an account with both permissions, or set the Apps Script `BACKEND_DRIVE_READER_EMAILS` property to the backend service account/OAuth account email so the script grants read access to each uploaded source file before sending the webhook.
 
 The Apps Script copy is in:
 
 ```txt
 backend/integrations/google-form-apps-script.gs
 ```
+
+The Apps Script manifest with required permissions is in:
+
+```txt
+backend/integrations/appsscript.json
+```
+
+After pasting both files into Apps Script, run `authorizeGoogleFormAutomation` once from the editor and approve permissions. This grants the spreadsheet, Drive, script properties, and URL fetch scopes needed by the installable trigger.
 
 ## Health Checks
 

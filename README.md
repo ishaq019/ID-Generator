@@ -138,7 +138,8 @@ Google Form
 -> Apps Script
 -> POST /api/google-form/digival-card
 -> MERN backend
--> backend decodes the base64 photo and removes background
+-> backend downloads the submitted photo from Google Drive by file ID
+-> backend optionally removes the background
 -> processed photo is saved to Google Drive
 -> card data is saved in MongoDB
 ```
@@ -175,22 +176,27 @@ https://id-generator-backend-jet.vercel.app/api/google-form/health
 2. Go to `Responses` and link it to a Google Sheet.
 3. In the linked Sheet, open `Extensions` -> `Apps Script`.
 4. Paste the contents of [google-form-apps-script.gs](backend/integrations/google-form-apps-script.gs).
-5. In the Apps Script editor, update `FIELD_TITLES` so each value exactly matches your form question title or response sheet column header.
-6. Open `Project Settings` -> `Script properties` and add:
+5. In Apps Script `Project Settings`, enable `Show "appsscript.json" manifest file in editor`, then paste [appsscript.json](backend/integrations/appsscript.json) into the manifest file.
+6. In the Apps Script editor, update `FIELD_TITLES` so each value exactly matches your form question title or response sheet column header.
+7. Open `Project Settings` -> `Script properties` and add:
 
 ```txt
 WEBHOOK_SECRET=the same value as backend WEBHOOK_SECRET
 BACKEND_URL=https://id-generator-backend-jet.vercel.app/api/google-form/digival-card
+BACKEND_DRIVE_READER_EMAILS=backend service account email or Drive OAuth account email
 ```
 
-7. Open `Triggers` -> `Add Trigger`.
-8. Choose function: `onFormSubmit`.
-9. Choose deployment: `Head`.
-10. Choose event source: `From spreadsheet`.
-11. Choose event type: `On form submit`.
-12. Save, authorize the requested Apps Script permissions, then submit a test response.
+8. In the editor, select function `authorizeGoogleFormAutomation`, click `Run`, and approve permissions.
+9. Open `Triggers` -> `Add Trigger`.
+10. Choose function: `onFormSubmit`.
+11. Choose deployment: `Head`.
+12. Choose event source: `From spreadsheet`.
+13. Choose event type: `On form submit`.
+14. Save, authorize if prompted, then submit a test response.
 
-The Apps Script reads the uploaded photo and sends it as base64. The backend removes the background, uploads the processed image to Google Drive, and stores the final card in MongoDB.
+The Apps Script reads the submitted response row, extracts the uploaded photo's Google Drive file ID, and sends `photoFileId` to the backend. The backend downloads that Drive file, removes the background when enabled, uploads the processed image to the configured project Drive folder, and stores the final card in MongoDB. Legacy `photoBase64` webhook payloads are still accepted as a fallback.
+
+`BACKEND_DRIVE_READER_EMAILS` is optional only when the backend already uses the same Google account that owns the Form uploads. If the backend uses a service account or a different OAuth account, set this property so Apps Script grants that account read access to each uploaded Form file before calling the webhook.
 
 After a test submission, check:
 
