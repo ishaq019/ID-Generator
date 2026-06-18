@@ -1,5 +1,4 @@
-const BACKEND_URL_FALLBACK =
-  "https://id-generator-backend-jet.vercel.app/api/google-form/digival-card";
+const BACKEND_URL_FALLBACK = "";
 
 // Update these values so they exactly match your Google Form question titles
 // or the linked response sheet column headers. Arrays allow old/new labels.
@@ -13,10 +12,14 @@ const FIELD_TITLES = {
 };
 
 function authorizeGoogleFormAutomation() {
+  const authorizationUrl =
+    getScriptSetting_("BACKEND_URL", BACKEND_URL_FALLBACK) ||
+    "https://example.com";
+
   PropertiesService.getScriptProperties().getProperties();
   SpreadsheetApp.getActiveSpreadsheet().getSheets()[0].getLastRow();
   DriveApp.getRootFolder().getName();
-  UrlFetchApp.getRequest(BACKEND_URL_FALLBACK);
+  UrlFetchApp.getRequest(authorizationUrl);
 
   Logger.log(
     "Authorization check completed. Now use the installable spreadsheet form-submit trigger."

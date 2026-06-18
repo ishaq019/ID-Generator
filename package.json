@@ -1,0 +1,13 @@
+{
+  "name": "id-generator-heroku-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Heroku deployment shim for the ID Generator backend.",
+  "engines": {
+    "node": "20.x"
+  },
+  "scripts": {
+    "start": "npm --prefix backend start",
+    "heroku-postbuild": "npm --prefix backend ci --omit=dev"
+  }
+}

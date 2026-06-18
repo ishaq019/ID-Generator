@@ -2,6 +2,10 @@
 
 Express/MongoDB backend for template management, generated card records, image uploads, and Google Form driven DigiVal ID card generation.
 
+## Google API Setup
+
+For step-by-step Google Drive API setup, including `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN`, Drive folder ID, Heroku config vars, MongoDB settings, and troubleshooting, read [GOOGLE_API_SETUP.md](GOOGLE_API_SETUP.md).
+
 ## Local Setup
 
 ```bash
@@ -17,6 +21,119 @@ npm install
 copy .env.example .env
 npm run dev
 ```
+
+## Heroku GUI Deployment
+
+This backend folder is deployable as a standalone Heroku Node app. It includes:
+
+```txt
+Procfile
+app.json
+package.json
+package-lock.json
+server.js
+```
+
+One-click deploy from the backend repo:
+
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/ishaq019/ID-Generator-Back)
+
+Manual Heroku Dashboard deploy:
+
+1. Push this backend repo to GitHub.
+2. Open `https://dashboard.heroku.com`, then choose `New` -> `Create new app`.
+3. Open `Settings` -> `Config Vars` and add the values below. Do not add `PORT`; Heroku sets it automatically.
+4. Required config vars:
+
+```txt
+MONGO_URI=your MongoDB Atlas connection string
+AUTH_SECRET=a long random secret
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=a strong admin password
+WEBHOOK_SECRET=a long random secret for Apps Script
+NODE_ENV=production
+```
+
+5. Add Google Drive config vars if uploads or Google Form generation will be used:
+
+```txt
+GOOGLE_DRIVE_FOLDER_ID=your Drive folder ID
+GOOGLE_DRIVE_CLIENT_ID=your OAuth client ID
+GOOGLE_DRIVE_CLIENT_SECRET=your OAuth client secret
+GOOGLE_DRIVE_REDIRECT_URI=https://developers.google.com/oauthplayground
+GOOGLE_DRIVE_REFRESH_TOKEN=your OAuth refresh token
+```
+
+6. Optional Heroku-friendly background-removal defaults:
+
+```txt
+BACKGROUND_REMOVAL_ENABLED=true
+GOOGLE_FORM_REMOVE_BG=true
+BG_REMOVAL_FALLBACK_ENABLED=true
+BG_REMOVAL_MODEL=small
+BG_REMOVAL_MAX_DIMENSION=768
+BG_REMOVAL_TIMEOUT_MS=22000
+REQUEST_BODY_LIMIT=50mb
+UPLOAD_FILE_SIZE_LIMIT=5mb
+GOOGLE_FORM_PHOTO_MAX_SIZE=10mb
+```
+
+7. Open the `Deploy` tab, choose `GitHub`, connect `ID-Generator-Back`, select the branch, then click `Deploy Branch`.
+8. Open `Resources` and make sure the `web` dyno is enabled.
+9. Test the deployed API:
+
+```txt
+https://your-heroku-app-name.herokuapp.com/health
+```
+
+Expected response:
+
+```json
+{ "status": "ok" }
+```
+
+After deployment, update the frontend deployment with:
+
+```txt
+VITE_API_BASE_URL=https://your-heroku-app-name.herokuapp.com/api
+```
+
+For Google Apps Script, set script property:
+
+```txt
+BACKEND_URL=https://your-heroku-app-name.herokuapp.com/api/google-form/digival-card
+WEBHOOK_SECRET=the same value as Heroku WEBHOOK_SECRET
+```
+
+If MongoDB Atlas blocks the connection, open Atlas `Network Access` and allow access for the Heroku app. For a simple first deploy, many projects use `0.0.0.0/0`; tighten this later if your hosting/network plan allows it.
+
+### Heroku 503 or Browser CORS Error
+
+If the browser says `No 'Access-Control-Allow-Origin' header` and the Network tab also shows `503 Service Unavailable`, check the Heroku app first. A Heroku `Application Error` page means the request did not reach Express, so it is usually a crashed dyno or missing production config, not a frontend CORS setting.
+
+After deployment, test:
+
+```txt
+https://your-heroku-app-name.herokuapp.com/health
+https://your-heroku-app-name.herokuapp.com/ready
+```
+
+`/health` only confirms the Express server is running. `/ready` checks MongoDB, `AUTH_SECRET`, and default template seeding. If `/ready` returns `503`, open Heroku `More` -> `View logs` and check these config vars first: `MONGO_URI`, `AUTH_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `WEBHOOK_SECRET`.
+
+### Heroku Background Removal
+
+For Heroku, keep background removal enabled but bounded:
+
+```txt
+BACKGROUND_REMOVAL_ENABLED=true
+GOOGLE_FORM_REMOVE_BG=true
+BG_REMOVAL_FALLBACK_ENABLED=true
+BG_REMOVAL_MODEL=small
+BG_REMOVAL_MAX_DIMENSION=768
+BG_REMOVAL_TIMEOUT_MS=22000
+```
+
+If `BACKGROUND_REMOVAL_ENABLED` or `GOOGLE_FORM_REMOVE_BG` is set to `false` in Heroku Config Vars or in the MongoDB `settings` document, the backend will upload the original image without removing the background. Heroku Config Vars override MongoDB for these background-removal kill switches.
 
 ## Environment Fallbacks
 
@@ -51,7 +168,7 @@ npm run check:drive-config
 
 This prints detected Mongo keys, masked credential fingerprints, and whether Google accepts the configured refresh token.
 
-Optional app behavior can be configured with `DIGIVAL_TEMPLATE_SLUG`, `COMPANY_WEBSITE`, `COMPANY_ADDRESS`, `BACKGROUND_REMOVAL_ENABLED`, `GOOGLE_FORM_REMOVE_BG`, `BG_REMOVAL_MODEL`, `BG_REMOVAL_MAX_DIMENSION`, and `GOOGLE_FORM_PHOTO_MAX_SIZE`.
+Optional app behavior can be configured with `DIGIVAL_TEMPLATE_SLUG`, `COMPANY_WEBSITE`, `COMPANY_ADDRESS`, `BACKGROUND_REMOVAL_ENABLED`, `GOOGLE_FORM_REMOVE_BG`, `BG_REMOVAL_FALLBACK_ENABLED`, `BG_REMOVAL_MODEL`, `BG_REMOVAL_MAX_DIMENSION`, `BG_REMOVAL_TIMEOUT_MS`, and `GOOGLE_FORM_PHOTO_MAX_SIZE`.
 
 ## MongoDB Config
 
@@ -106,7 +223,7 @@ The response includes `imageUrl`, `fileId`, and `file` metadata. `imageUrl` poin
 ## Google Form Endpoint
 
 ```txt
-POST https://id-generator-backend-jet.vercel.app/api/google-form/digival-card
+POST https://your-heroku-app-name.herokuapp.com/api/google-form/digival-card
 ```
 
 Required header:
@@ -155,6 +272,6 @@ GET /health
 GET /api/google-form/health
 ```
 
-## Vercel Note
+## Hosted Storage Note
 
-Vercel does not provide persistent local upload storage. Uploaded images are stored in Google Drive and card records keep Drive-backed `/api/files/:fileId` URLs in MongoDB.
+Heroku and other hosted Node platforms do not provide reliable persistent local upload storage for app files. Uploaded images are stored in Google Drive and card records keep Drive-backed `/api/files/:fileId` URLs in MongoDB.

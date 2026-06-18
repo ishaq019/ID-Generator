@@ -61,6 +61,8 @@ const createUploadHandler = (fieldName) => [
             fileName: req.body?.fileName || req.file.originalname,
             model: appConfig.bgRemovalModel,
             maxDimension: appConfig.bgRemovalMaxDimension,
+            timeoutMs: appConfig.bgRemovalTimeoutMs,
+            fallbackEnabled: appConfig.bgRemovalFallbackEnabled,
           });
         } catch (bgError) {
           console.error("BACKGROUND REMOVAL FAILED:", bgError);
@@ -85,6 +87,9 @@ const createUploadHandler = (fieldName) => [
           ? "Background removed and image uploaded successfully"
           : "Image uploaded successfully",
         backgroundRemoved: removeBg,
+        backgroundRemovalMode: removeBg
+          ? fileToUpload.backgroundRemovalMode || "ml"
+          : "none",
         imageUrl: versionedUrl,
         fileId: uploadedFile.fileId,
         file: {
