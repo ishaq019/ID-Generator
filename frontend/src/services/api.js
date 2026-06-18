@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const LOCAL_API_BASE_URL = "http://localhost:5000/api";
+const LOCAL_API_BASE_URL = "https://id-card-7c27356a0270.herokuapp.com/api";
 
 const normalizeApiBaseUrl = (value) => {
   const baseUrl = String(value || "").trim().replace(/\/+$/, "");

@@ -151,8 +151,8 @@ function DigivalFront({ template, formData }) {
   );
 }
 function DigivalBack({ template, formData }) {
-  const bloodGroup = getFieldValue(formData, template, "bloodGroup", "B+ve");
-  const phone = getFieldValue(formData, template, "phone", "7824804804");
+  const bloodGroup = getFieldValue(formData, template, "bloodGroup", "X+ve");
+  const phone = getFieldValue(formData, template, "phone", "xxxxxxxxxx");
 
   return (
     <div className="id-card-preview digival-card">

@@ -17,6 +17,8 @@ const DIGIVAL_PHOTO_ADJUST_FIELDS = [
   { key: "photoWidth", label: "Width", min: 180, max: 440 },
   { key: "photoHeight", label: "Height", min: 220, max: 520 },
 ];
+const ENABLE_UPLOAD_BACKGROUND_REMOVAL =
+  import.meta.env.VITE_UPLOAD_BACKGROUND_REMOVAL === "true";
 
 const buildEmptyFormData = (fields = []) => {
   return fields.reduce((emptyData, field) => {
@@ -152,7 +154,8 @@ function GenerateCard() {
 
     try {
       const response = await uploadAPI.image(file, {
-        removeBackground: fieldKey === "photo",
+        removeBackground:
+          ENABLE_UPLOAD_BACKGROUND_REMOVAL && fieldKey === "photo",
         fileName: formData.employeeId ? `${formData.employeeId}-photo.png` : file.name,
       });
 
