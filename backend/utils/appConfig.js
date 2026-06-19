@@ -51,7 +51,17 @@ const SETTING_ALIASES = {
     "backgroundRemovalEnabled",
     "background_removal_enabled"
   ],
+  UPLOAD_BG_REMOVAL_MODE: [
+    "uploadBgRemovalMode",
+    "upload_bg_removal_mode",
+    "adminUploadBgRemovalMode",
+    "admin_upload_bg_removal_mode"
+  ],
   GOOGLE_FORM_REMOVE_BG: ["googleFormRemoveBg", "google_form_remove_bg"],
+  GOOGLE_FORM_BG_REMOVAL_MODE: [
+    "googleFormBgRemovalMode",
+    "google_form_bg_removal_mode"
+  ],
   BG_REMOVAL_FALLBACK_ENABLED: [
     "bgRemovalFallbackEnabled",
     "bg_removal_fallback_enabled"
@@ -127,6 +137,24 @@ const parseTimeoutMs = (value, fallback = 22000) => {
   }
 
   return Math.min(Math.max(Math.round(timeoutMs), 5000), 28000);
+};
+
+const parseBgRemovalMode = (value, fallback) => {
+  const mode = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (!mode) return fallback;
+
+  if (["ml", "solid", "none"].includes(mode)) {
+    return mode;
+  }
+
+  if (["false", "0", "no", "off"].includes(mode)) {
+    return "none";
+  }
+
+  return fallback;
 };
 
 const hasConfiguredValue = (source, key) => {
@@ -205,6 +233,7 @@ const buildAppConfig = (settings = {}) => {
   const hostedRuntime = isHostedRuntime();
   const backgroundRemovalDefault = true;
   const bgRemovalMaxDimensionDefault = hostedRuntime ? 768 : 1024;
+  const bgRemovalModeDefault = hostedRuntime ? "solid" : "ml";
   const corsOrigins = [
     ...DEFAULT_ALLOWED_ORIGINS,
     readSetting(settings, "CLIENT_URL"),
@@ -261,9 +290,17 @@ const buildAppConfig = (settings = {}) => {
       readEnvOverrideSetting(settings, "BACKGROUND_REMOVAL_ENABLED"),
       backgroundRemovalDefault
     ),
+    uploadBgRemovalMode: parseBgRemovalMode(
+      readEnvOverrideSetting(settings, "UPLOAD_BG_REMOVAL_MODE"),
+      bgRemovalModeDefault
+    ),
     googleFormRemoveBg: parseBoolean(
       readEnvOverrideSetting(settings, "GOOGLE_FORM_REMOVE_BG"),
       backgroundRemovalDefault
+    ),
+    googleFormBgRemovalMode: parseBgRemovalMode(
+      readEnvOverrideSetting(settings, "GOOGLE_FORM_BG_REMOVAL_MODE"),
+      bgRemovalModeDefault
     ),
     bgRemovalFallbackEnabled: parseBoolean(
       readEnvOverrideSetting(settings, "BG_REMOVAL_FALLBACK_ENABLED"),
