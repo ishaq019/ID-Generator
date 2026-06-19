@@ -242,13 +242,15 @@ Required JSON fields:
   "phone": "9876543210",
   "email": "employee@example.com",
   "photoFileId": "google drive file id from the Form upload cell",
+  "photoBase64": "optional base64 fallback image bytes",
+  "photoMimeType": "image/png",
   "submissionId": "unique google sheet row id"
 }
 ```
 
-The Apps Script runs from the linked Google Sheet, reads the submitted row, extracts the uploaded image's Drive file ID, and sends `photoFileId` to the backend. The backend downloads that file, removes the background when enabled, and uploads the processed image to the output folder configured by `GOOGLE_DRIVE_FOLDER_ID`. Legacy `photoBase64` plus `photoMimeType` payloads are still accepted as a fallback.
+The Apps Script runs from the linked Google Sheet, reads the submitted row, extracts the uploaded image's Drive file ID, and sends `photoFileId` to the backend. It also sends `photoBase64` plus `photoMimeType` by default as a fallback. The backend first tries to download the Drive file, then uses the base64 image if the Google Drive download returns an access/not-found error. After reading the photo, the backend removes the background when enabled and uploads the processed image to the output folder configured by `GOOGLE_DRIVE_FOLDER_ID`.
 
-The backend Google Drive credentials must be able to read the Form-uploaded source file and write to the output folder. Use OAuth credentials for an account with both permissions, or set the Apps Script `BACKEND_DRIVE_READER_EMAILS` property to the backend service account/OAuth account email so the script grants read access to each uploaded source file before sending the webhook.
+The backend Google Drive credentials must be able to write to the output folder. They should also be able to read the Form-uploaded source file when you want the primary Drive-file path to work. Use OAuth credentials for an account with both permissions, or set the Apps Script `BACKEND_DRIVE_READER_EMAILS` property to the backend service account/OAuth account email so the script grants read access to each uploaded source file before sending the webhook. Do not set `BACKEND_DRIVE_READER_EMAILS` to the employee/respondent email.
 
 The Apps Script copy is in:
 

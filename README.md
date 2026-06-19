@@ -293,6 +293,7 @@ https://your-heroku-app-name.herokuapp.com/api/google-form/health
 WEBHOOK_SECRET=the same value as backend WEBHOOK_SECRET
 BACKEND_URL=https://your-heroku-app-name.herokuapp.com/api/google-form/digival-card
 BACKEND_DRIVE_READER_EMAILS=backend service account email or Drive OAuth account email
+SEND_PHOTO_BASE64_FALLBACK=true
 ```
 
 8. In the editor, select function `authorizeGoogleFormAutomation`, click `Run`, and approve permissions.
@@ -303,9 +304,9 @@ BACKEND_DRIVE_READER_EMAILS=backend service account email or Drive OAuth account
 13. Choose event type: `On form submit`.
 14. Save, authorize if prompted, then submit a test response.
 
-The Apps Script reads the submitted response row, extracts the uploaded photo's Google Drive file ID, and sends `photoFileId` to the backend. The backend downloads that Drive file, removes the background when enabled, uploads the processed image to the configured project Drive folder, and stores the final card in MongoDB. Legacy `photoBase64` webhook payloads are still accepted as a fallback.
+The Apps Script reads the submitted response row, extracts the uploaded photo's Google Drive file ID, and sends `photoFileId` to the backend. It also sends a `photoBase64` fallback by default, so a submission can still be processed if Google Drive has not made the uploaded file visible to the backend account yet. The backend first tries to download the Drive file, then falls back to the base64 image when the Drive download returns a Google API access/not-found error.
 
-`BACKEND_DRIVE_READER_EMAILS` is optional only when the backend already uses the same Google account that owns the Form uploads. If the backend uses a service account or a different OAuth account, set this property so Apps Script grants that account read access to each uploaded Form file before calling the webhook.
+`BACKEND_DRIVE_READER_EMAILS` must be the backend Google Drive credential email: the Google account that generated `GOOGLE_DRIVE_REFRESH_TOKEN`, or the service account email from `GOOGLE_CLIENT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_JSON`. Do not set it to the employee/respondent email from the Form. It is optional only when the backend already uses the same Google account that owns the Form uploads. Set `SEND_PHOTO_BASE64_FALLBACK=false` only if you want to disable the base64 fallback and rely entirely on Drive permissions.
 
 After a test submission, check:
 

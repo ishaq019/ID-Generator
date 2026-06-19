@@ -313,7 +313,23 @@ const buildGoogleFormPhotoFileFromDrive = async (payload, appConfig) => {
 const buildGoogleFormPhotoFile = async (payload, appConfig) => {
   // Primary Google Sheet flow: Apps Script sends the Drive file ID only.
   if (payload.photoFileId) {
-    return buildGoogleFormPhotoFileFromDrive(payload, appConfig);
+    try {
+      return await buildGoogleFormPhotoFileFromDrive(payload, appConfig);
+    } catch (error) {
+      if (!payload.photoBase64 || !error.driveStatusCode) {
+        throw error;
+      }
+
+      console.warn(
+        "Google Form photoFileId download failed; using photoBase64 fallback.",
+        {
+          driveStatusCode: error.driveStatusCode,
+          statusCode: error.statusCode,
+        },
+      );
+
+      return buildGoogleFormPhotoFileFromBase64(payload, appConfig);
+    }
   }
 
   // Legacy webhook fallback: older scripts sent the image bytes directly.

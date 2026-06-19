@@ -139,9 +139,7 @@ export const uploadAPI = {
     }
 
     return api
-      .post("/uploads/photo", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      .post("/uploads/photo", formData)
       .then((response) => {
         const imageUrl =
           response.data.imageUrl || response.data.file?.imageUrl || "";
