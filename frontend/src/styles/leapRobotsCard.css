@@ -1,0 +1,228 @@
+.leap-card {
+  width: 360px;
+  height: 600px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(16, 38, 49, 0.18);
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  color: #102631;
+  font-family: "Poppins", Arial, sans-serif;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.leap-card * {
+  box-sizing: border-box;
+}
+
+.leap-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.leap-content {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.leap-logo-wrap {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  right: 0;
+  height: 74px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 4;
+}
+
+.leap-logo {
+  width: 252px;
+  max-height: 68px;
+  object-fit: contain;
+  display: block;
+}
+
+.leap-photo-wrap {
+  position: absolute;
+  top: 120px;
+  left: 20px;
+  right: 20px;
+  height: 260px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: visible;
+  z-index: 2;
+}
+
+.leap-photo {
+  object-fit: contain;
+  object-position: center bottom;
+  display: block;
+  max-width: 260px;
+  max-height: 260px;
+  filter: drop-shadow(0 9px 10px rgba(16, 38, 49, 0.14));
+}
+
+.leap-photo-placeholder {
+  width: 190px;
+  height: 226px;
+  border-radius: 24px 24px 0 0;
+  border: 1px dashed rgba(16, 38, 49, 0.28);
+  background: rgba(255, 255, 255, 0.62);
+  color: rgba(16, 38, 49, 0.55);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* NAME GREEN BAND */
+.leap-name-band {
+  position: absolute;
+  top: 348px;
+  left: 0;
+  right: 0;
+  height: 104px;
+  padding: 12px 18px;
+  background: linear-gradient(
+    90deg,
+    rgba(1, 29, 5, 0.98),
+    rgba(1, 44, 20, 0.98)
+  );
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.leap-name-band h2 {
+  width: 100%;
+  max-width: 320px;
+  margin: 0;
+  color: #ffffff;
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.leap-name-band h2.long {
+  font-size: 25px;
+}
+
+.leap-name-band h2.extra-long {
+  font-size: 21px;
+}
+
+.leap-name-band p {
+  width: 100%;
+  max-width: 320px;
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* DETAILS SECTION */
+.leap-info {
+  position: absolute;
+  top: 452px;
+  left: 0px;
+  right: 0px;
+  min-height: 145px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  color: #102631;
+  text-align: center;
+  font-size: 18.5px;
+  font-weight: 500;
+  line-height: 1.16;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.leap-info p {
+  margin: 0;
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
+/* FIXED LABEL + VALUE ALIGNMENT */
+.leap-info-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px;
+}
+.leap-info-label {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.leap-info-value {
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.leap-blood-value {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.leap-blood-value sup {
+  position: relative;
+  top: -0.08em;
+  font-size: 0.62em;
+  line-height: 1;
+}
+
+.leap-info .leap-email {
+  margin-top: 2px;
+  width: 100%;
+  text-align: center;
+  font-size: 18.5px;
+  line-height: 1.15;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.leap-info .leap-email.long {
+  font-size: 16px;
+}
+
+/* RESPONSIVE FIX */
+@media (max-width: 560px) {
+  .preview-card-stage .leap-card {
+    width: min(360px, 100%);
+    height: auto;
+    aspect-ratio: 3 / 5;
+  }
+}

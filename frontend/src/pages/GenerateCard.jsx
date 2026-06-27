@@ -5,17 +5,45 @@ import ExportButtons from "../components/ExportButtons";
 import { cardAPI, templateAPI, uploadAPI } from "../services/api";
 
 const DIGIVAL_HIDDEN_FIELDS = ["address", "website", "qr"];
+const LEAP_ROBOTS_FIELD_KEYS = [
+  "name",
+  "role",
+  "photo",
+  "employeeId",
+  "bloodGroup",
+  "phone",
+  "email",
+];
+const LEAP_ROBOTS_PREPARED_KEYS = [
+  ...LEAP_ROBOTS_FIELD_KEYS,
+  "photoX",
+  "photoY",
+  "photoWidth",
+  "photoHeight",
+];
 const DIGIVAL_PHOTO_DEFAULTS = {
   photoX: "0",
   photoY: "0",
   photoWidth: "300",
   photoHeight: "346",
 };
+const LEAP_ROBOTS_PHOTO_DEFAULTS = {
+  photoX: "0",
+  photoY: "0",
+  photoWidth: "320",
+  photoHeight: "260",
+};
 const DIGIVAL_PHOTO_ADJUST_FIELDS = [
   { key: "photoX", label: "X", min: -80, max: 80 },
   { key: "photoY", label: "Y", min: -80, max: 80 },
   { key: "photoWidth", label: "Width", min: 180, max: 440 },
   { key: "photoHeight", label: "Height", min: 220, max: 520 },
+];
+const LEAP_ROBOTS_PHOTO_ADJUST_FIELDS = [
+  { key: "photoX", label: "X", min: -120, max: 120 },
+  { key: "photoY", label: "Y", min: -120, max: 120 },
+  { key: "photoWidth", label: "Width", min: 160, max: 440 },
+  { key: "photoHeight", label: "Height", min: 180, max: 520 },
 ];
 const ENABLE_UPLOAD_BACKGROUND_REMOVAL =
   import.meta.env.VITE_UPLOAD_BACKGROUND_REMOVAL !== "false";
@@ -29,6 +57,22 @@ const buildEmptyFormData = (fields = []) => {
 
 const isDigiValTemplate = (template) => {
   return template?.layoutKey === "digival";
+};
+
+const isLeapRobotsTemplate = (template) => {
+  return template?.layoutKey === "leaprobots";
+};
+
+const isTemplateQrManaged = (template) => {
+  return isDigiValTemplate(template) || isLeapRobotsTemplate(template);
+};
+
+const normalizeLeapBloodGroup = (value) => {
+  const compactValue = String(value || "").replace(/\s+/g, "");
+  const firstCharacter = compactValue.charAt(0).toUpperCase();
+  const secondCharacter = compactValue.charAt(1);
+
+  return `${firstCharacter}${secondCharacter}`.slice(0, 2);
 };
 
 function GenerateCard() {
@@ -50,11 +94,31 @@ function GenerateCard() {
     return isDigiValTemplate(selectedTemplate) && DIGIVAL_HIDDEN_FIELDS.includes(field.key);
   };
 
+  const isHiddenLeapRobotsField = (field) => {
+    return isLeapRobotsTemplate(selectedTemplate) && !LEAP_ROBOTS_FIELD_KEYS.includes(field.key);
+  };
+
   const isDigiValPhotoField = (field) => {
     return isDigiValTemplate(selectedTemplate) && field.key === "photo";
   };
 
+  const isLeapRobotsPhotoField = (field) => {
+    return isLeapRobotsTemplate(selectedTemplate) && field.key === "photo";
+  };
+
   const getPreparedFormData = () => {
+    if (isLeapRobotsTemplate(selectedTemplate)) {
+      return LEAP_ROBOTS_PREPARED_KEYS.reduce((preparedData, key) => {
+        if (key === "bloodGroup") {
+          preparedData[key] = normalizeLeapBloodGroup(formData[key]);
+          return preparedData;
+        }
+
+        preparedData[key] = formData[key] || "";
+        return preparedData;
+      }, {});
+    }
+
     if (!isDigiValTemplate(selectedTemplate)) {
       return formData;
     }
@@ -71,7 +135,9 @@ function GenerateCard() {
   };
 
   const getFinalQrData = () => {
-    return isDigiValTemplate(selectedTemplate) ? "STATIC_DIGIVAL_QR" : qrData;
+    if (isDigiValTemplate(selectedTemplate)) return "STATIC_DIGIVAL_QR";
+    if (isLeapRobotsTemplate(selectedTemplate)) return "";
+    return qrData;
   };
 
   useEffect(() => {
@@ -135,13 +201,17 @@ function GenerateCard() {
   };
 
   const updateValue = (key, value) => {
+    const nextValue =
+      isLeapRobotsTemplate(selectedTemplate) && key === "bloodGroup"
+        ? normalizeLeapBloodGroup(value)
+        : value;
     const updatedData = {
       ...formData,
-      [key]: value,
+      [key]: nextValue,
     };
 
     setFormData(updatedData);
-    setQrData(isDigiValTemplate(selectedTemplate) ? "STATIC_DIGIVAL_QR" : JSON.stringify(updatedData));
+    setQrData(isTemplateQrManaged(selectedTemplate) ? getFinalQrData() : JSON.stringify(updatedData));
   };
 
   const handleImageUpload = async (fieldKey, file) => {
@@ -153,10 +223,18 @@ function GenerateCard() {
     }
 
     try {
+      const leapRobotsPhotoUpload =
+        isLeapRobotsTemplate(selectedTemplate) && fieldKey === "photo";
+      const fileNameBase = String(formData.name || "leaprobots").trim() || "leaprobots";
       const response = await uploadAPI.image(file, {
         removeBackground:
-          ENABLE_UPLOAD_BACKGROUND_REMOVAL && fieldKey === "photo",
-        fileName: formData.employeeId ? `${formData.employeeId}-photo.png` : file.name,
+          leapRobotsPhotoUpload ||
+          (ENABLE_UPLOAD_BACKGROUND_REMOVAL && fieldKey === "photo"),
+        fileName: leapRobotsPhotoUpload
+          ? `${fileNameBase}-photo.png`
+          : formData.employeeId
+            ? `${formData.employeeId}-photo.png`
+            : file.name,
       });
 
       if (isDigiValTemplate(selectedTemplate) && fieldKey === "photo") {
@@ -166,6 +244,16 @@ function GenerateCard() {
           photo: response.data.imageUrl,
         }));
         setQrData("STATIC_DIGIVAL_QR");
+        return;
+      }
+
+      if (leapRobotsPhotoUpload) {
+        setFormData((previousData) => ({
+          ...LEAP_ROBOTS_PHOTO_DEFAULTS,
+          ...previousData,
+          photo: response.data.imageUrl,
+        }));
+        setQrData("");
         return;
       }
 
@@ -296,6 +384,7 @@ function GenerateCard() {
             {selectedTemplate?.fields
               ?.filter((field) => field.type !== "qr")
               .filter((field) => !isHiddenDigiValField(field))
+              .filter((field) => !isHiddenLeapRobotsField(field))
               .map((field) => (
                 <label key={field._id || field.key}>
                   {field.label} {field.required && <span className="required">*</span>}
@@ -305,7 +394,8 @@ function GenerateCard() {
                       <input
                         type="file"
                         accept={
-                          isDigiValPhotoField(field)
+                          isDigiValPhotoField(field) ||
+                          isLeapRobotsPhotoField(field)
                             ? "image/png,image/jpeg,image/jpg,image/webp"
                             : "image/*"
                         }
@@ -343,6 +433,36 @@ function GenerateCard() {
                           </div>
                         </>
                       )}
+
+                      {isLeapRobotsPhotoField(field) && (
+                        <>
+                          <span className="helper-text">
+                            Upload a portrait photo. Background removal is applied
+                            automatically for this layout.
+                          </span>
+
+                          <div className="photo-adjust-grid">
+                            {LEAP_ROBOTS_PHOTO_ADJUST_FIELDS.map((setting) => (
+                              <label key={setting.key}>
+                                {setting.label}
+                                <input
+                                  type="number"
+                                  min={setting.min}
+                                  max={setting.max}
+                                  step="1"
+                                  value={
+                                    formData[setting.key] ??
+                                    LEAP_ROBOTS_PHOTO_DEFAULTS[setting.key]
+                                  }
+                                  onChange={(event) =>
+                                    updateValue(setting.key, event.target.value)
+                                  }
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </>
                   ) : field.type === "textarea" ? (
                     <textarea
@@ -369,7 +489,7 @@ function GenerateCard() {
                 </label>
               ))}
 
-            {!isDigiValTemplate(selectedTemplate) && (
+            {!isTemplateQrManaged(selectedTemplate) && (
               <label>
                 QR Data
                 <textarea

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { resolveApiAssetUrl } from "../services/api";
+import leapRobotsBg from "../assets/leap-robots-bg.png";
+import leapRobotsLogo from "../assets/leap-robots-logo.png";
+import LeapRobotsCard from "./LeapRobotsCard";
 
 const publicAsset = (path) => {
   return `${import.meta.env.BASE_URL}${path.replace(/^\/+/, "")}`;
@@ -298,6 +301,16 @@ function CardSide({ template, side, formData, qrData }) {
       <DigivalFront template={template} formData={formData} />
     ) : (
       <DigivalBack template={template} formData={formData} />
+    );
+  }
+
+  if (template.layoutKey === "leaprobots") {
+    return (
+      <LeapRobotsCard
+        formData={formData}
+        logoSrc={leapRobotsLogo}
+        bgSrc={leapRobotsBg}
+      />
     );
   }
 

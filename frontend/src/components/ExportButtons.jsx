@@ -35,6 +35,18 @@ const waitForImage = img => {
   });
 };
 
+const waitForFonts = async () => {
+  if (!document.fonts?.ready) return;
+
+  await document.fonts.ready;
+};
+
+const waitForPaint = () => {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+};
+
 const inlineImages = async clone => {
   const images = Array.from(clone.querySelectorAll("img"));
 
@@ -46,6 +58,10 @@ const inlineImages = async clone => {
       img.removeAttribute("crossorigin");
       img.src = await imageToDataUrl(src);
       await waitForImage(img);
+
+      if (img.decode) {
+        await img.decode().catch(() => {});
+      }
     })
   );
 };
@@ -66,35 +82,94 @@ const copyCanvasPixels = (source, clone) => {
   });
 };
 
-const renderElementToCanvas = async id => {
-  const element = document.getElementById(id);
-  if (!element) return null;
-
+const createCaptureHost = element => {
+  const rect = element.getBoundingClientRect();
+  const width = Math.ceil(rect.width || element.scrollWidth);
+  const height = Math.ceil(rect.height || element.scrollHeight);
+  const host = document.createElement("div");
   const clone = element.cloneNode(true);
-  copyCanvasPixels(element, clone);
 
-  clone.style.position = "absolute";
-  clone.style.left = "-10000px";
+  host.style.position = "fixed";
+  host.style.left = "0";
+  host.style.top = "0";
+  host.style.width = `${width}px`;
+  host.style.height = `${height}px`;
+  host.style.margin = "0";
+  host.style.padding = "0";
+  host.style.pointerEvents = "none";
+  host.style.zIndex = "-1";
+  host.style.background = "transparent";
+  host.style.overflow = "visible";
+
+  clone.removeAttribute("id");
+  clone.style.position = "relative";
+  clone.style.left = "0";
   clone.style.top = "0";
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.margin = "0";
   clone.style.transform = "none";
   clone.style.pointerEvents = "none";
-  clone.style.zIndex = "-1";
 
-  document.body.appendChild(clone);
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  return { host, clone, width, height };
+};
+
+const renderElementToCanvas = async id => {
+  const exportElement = document.getElementById(id);
+  if (!exportElement) return null;
+
+  const cardElement =
+    exportElement.querySelector(".id-card-preview") || exportElement;
+  const { host, clone, width, height } = createCaptureHost(cardElement);
+  copyCanvasPixels(cardElement, clone);
 
   try {
+    await waitForFonts();
     await inlineImages(clone);
+    await waitForPaint();
 
-    return await html2canvas(clone, {
+    return await html2canvas(host, {
       scale: 3,
+      width,
+      height,
       backgroundColor: null,
       useCORS: true,
       allowTaint: false,
-      imageTimeout: 15000
+      imageTimeout: 15000,
+      scrollX: 0,
+      scrollY: 0
     });
   } finally {
-    clone.remove();
+    host.remove();
   }
+};
+
+const triggerDownload = (href, fileName) => {
+  const link = document.createElement("a");
+  link.download = fileName;
+  link.href = href;
+  link.style.display = "none";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+const addCanvasToPdf = (pdf, canvas, label, x, y, maxWidth, maxHeight) => {
+  const aspectRatio = canvas.height / canvas.width;
+  let width = maxWidth;
+  let height = width * aspectRatio;
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height / aspectRatio;
+  }
+
+  pdf.text(label, x, y);
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y + 7, width, height);
 };
 
 function ExportButtons() {
@@ -107,10 +182,7 @@ function ExportButtons() {
       const canvas = await renderElementToCanvas(id);
       if (!canvas) return;
 
-      const link = document.createElement("a");
-      link.download = `${id}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      triggerDownload(canvas.toDataURL("image/png"), `${id}.png`);
     } catch (error) {
       alert(error.message || "Failed to create downloadable image");
     } finally {
@@ -128,11 +200,8 @@ function ExportButtons() {
 
       const pdf = new jsPDF("p", "mm", "a4");
 
-      pdf.text("Front Side", 15, 15);
-      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", 15, 22, 60, 95);
-
-      pdf.text("Back Side", 100, 15);
-      pdf.addImage(backCanvas.toDataURL("image/png"), "PNG", 100, 22, 60, 95);
+      addCanvasToPdf(pdf, frontCanvas, "Front Side", 15, 15, 75, 170);
+      addCanvasToPdf(pdf, backCanvas, "Back Side", 110, 15, 75, 170);
 
       pdf.save("id-card.pdf");
     } catch (error) {
