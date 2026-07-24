@@ -2,7 +2,7 @@
 
 A professional **MERN Stack ID Card Generator** for creating, managing, exporting, and printing custom ID cards for offices, universities, events, and internal organizations.
 
-This project includes a protected admin panel, dynamic template builder, live card preview, photo/logo uploads, QR code support, PNG/PDF export, MongoDB card storage, Google Drive image storage, and Google Form automation for DigiVal employee ID cards.
+This project includes an open admin panel, dynamic template builder, live card preview, photo/logo uploads, QR code support, PNG/PDF export, MongoDB card storage, Google Drive image storage, and Google Form automation for DigiVal employee ID cards.
 
 > ⚠️ **Important:** This project is only for internal ID cards such as company, college, event, or organization cards. Do **not** use it to create Aadhaar, PAN, passport, voter ID, driving license, or any government/official identity document.
 
@@ -46,13 +46,6 @@ This project includes a protected admin panel, dynamic template builder, live ca
 - Export back card as PNG
 - Export complete card as PDF
 - Print generated cards directly from the browser
-
-### 🔐 Admin Authentication
-
-- Protected admin dashboard
-- JWT-style token based login
-- Admin credentials from environment variables, MongoDB settings, or `static_auth` fallback
-- Automatic logout on unauthorized API response
 
 ### ☁️ Google Drive Uploads
 
@@ -105,7 +98,6 @@ This project includes a protected admin panel, dynamic template builder, live ca
 | 📦 Multer | Image upload handling |
 | ☁️ Google APIs | Google Drive integration |
 | 🧠 @imgly/background-removal-node | Background removal |
-| 🔐 Custom Auth Middleware | Protected API routes |
 
 ---
 
@@ -119,7 +111,6 @@ ID-Generator-main/
 │   │   └── digival/                  # DigiVal logo and QR assets
 │   └── src/
 │       ├── components/               # Reusable UI components
-│       ├── context/                  # Auth context
 │       ├── pages/                    # App pages
 │       ├── services/                 # Axios API service
 │       └── styles/                   # Global CSS
@@ -128,7 +119,7 @@ ID-Generator-main/
 │   ├── config/                       # DB and Google Drive config
 │   ├── controllers/                  # API business logic
 │   ├── integrations/                 # Google Apps Script integration
-│   ├── middleware/                   # Auth, CORS, upload, error middleware
+│   ├── middleware/                   # CORS, upload, error middleware
 │   ├── models/                       # Mongoose models
 │   ├── routes/                       # API routes
 │   ├── scripts/                      # Utility scripts
@@ -190,10 +181,6 @@ Create `backend/.env` using `backend/.env.example`.
 PORT=5000
 MONGO_URI=mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/id-card-generator
 
-AUTH_SECRET=replace-with-a-long-random-auth-secret
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=replace-with-a-strong-admin-password
-
 CLIENT_URL=http://localhost:5175
 CLIENT_URLS=http://localhost:5173,http://localhost:5175,https://syedishaq.me
 
@@ -218,7 +205,7 @@ BG_REMOVAL_MAX_DIMENSION=768
 BG_REMOVAL_TIMEOUT_MS=22000
 ```
 
-> 🔴 Do not commit `.env` files. They contain database credentials, admin login details, webhook secrets, and Google API tokens.
+> 🔴 Do not commit `.env` files. They contain database credentials, webhook secrets, and Google API tokens.
 
 ---
 
@@ -287,33 +274,9 @@ Expected ready response:
 
 ---
 
-## 🔑 Admin Login
+## Access
 
-The app supports admin authentication from:
-
-1. Environment variables
-2. MongoDB `settings` collection
-3. MongoDB `static_auth` fallback collection
-
-Basic `.env` login setup:
-
-```env
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-secure-password
-AUTH_SECRET=your-long-random-secret
-```
-
-Optional `static_auth` fallback document:
-
-```json
-{
-  "key": "admin-signin",
-  "username": "admin",
-  "password": "Admin@123"
-}
-```
-
-> ✅ Use a strong password in production. The sample password is only for local testing.
+The frontend and backend no longer require admin login. App pages and CRUD/upload APIs are available without bearer-token authentication.
 
 ---
 
@@ -326,18 +289,14 @@ Optional `static_auth` fallback document:
 | `GET` | `/` | API running message |
 | `GET` | `/health` | Basic server health check |
 | `GET` | `/ready` | Server readiness check |
-| `POST` | `/api/auth/login` | Admin login |
 | `GET` | `/api/files/:fileId` | Serve Google Drive image by file ID |
 | `GET` | `/api/google-form/health` | Google Form webhook health check |
 | `POST` | `/api/google-form/digival-card` | Create DigiVal card from Google Form |
 
-### Protected Routes
-
-These routes require admin authentication.
+### App Routes
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/auth/me` | Get logged-in admin profile |
 | `GET` | `/api/templates` | Get all templates |
 | `POST` | `/api/templates` | Create template |
 | `GET` | `/api/templates/:id` | Get template by ID |
@@ -456,9 +415,6 @@ Required Heroku config vars:
 ```env
 NODE_ENV=production
 MONGO_URI=your-mongodb-atlas-uri
-AUTH_SECRET=your-long-random-secret
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=your-secure-password
 WEBHOOK_SECRET=your-webhook-secret
 CLIENT_URL=https://your-frontend-url
 CLIENT_URLS=https://your-frontend-url,http://localhost:5175
@@ -565,8 +521,6 @@ uploadsPersisted
 ## 🛡️ Security Notes
 
 - Keep `.env` files private
-- Use a strong `AUTH_SECRET`
-- Use a strong admin password
 - Do not expose Google refresh tokens
 - Do not commit uploaded user images
 - Restrict MongoDB Atlas network access after first deployment
@@ -583,9 +537,6 @@ Check:
 
 ```txt
 MONGO_URI
-AUTH_SECRET
-ADMIN_USERNAME
-ADMIN_PASSWORD
 WEBHOOK_SECRET
 ```
 
@@ -673,8 +624,6 @@ npm run deploy
 
 - [ ] MongoDB Atlas database created
 - [ ] Backend `.env` or Heroku config vars added
-- [ ] Strong admin password configured
-- [ ] `AUTH_SECRET` configured
 - [ ] `WEBHOOK_SECRET` configured
 - [ ] Google Drive folder created
 - [ ] Google Drive OAuth refresh token generated
@@ -726,4 +675,3 @@ Built by **Syed Ishaq**
 ## ⭐ Support
 
 If this project helped you, consider giving the repository a star.
-

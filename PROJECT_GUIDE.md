@@ -14,7 +14,7 @@ This is a MERN ID Card Generator.
 
 The application lets an admin:
 
-- Login to a protected admin portal.
+- Open the admin portal without signing in.
 - View seeded default templates.
 - Create custom ID card templates.
 - Generate ID cards from dynamic form fields.
@@ -30,7 +30,7 @@ High-level flow:
 ```txt
 React frontend
 -> Express API
--> MongoDB for templates/cards/settings/auth fallback
+-> MongoDB for templates/cards/settings
 -> Google Drive for uploaded images
 ```
 
@@ -44,53 +44,35 @@ This project is for office, university, event, or internal organization ID cards
 
 The project uses:
 
-- MongoDB: stores templates, generated cards, runtime settings, and optional admin login document.
-- Express: exposes REST APIs for auth, templates, cards, uploads, files, and Google Form automation.
+- MongoDB: stores templates, generated cards, and runtime settings.
+- Express: exposes REST APIs for templates, cards, uploads, files, and Google Form automation.
 - React: builds the admin user interface.
-- Node.js: runs backend services, token signing, file processing, and Google Drive integration.
+- Node.js: runs backend services, file processing, and Google Drive integration.
 
-### Authentication
-
-Authentication is custom and simple:
+### Access
 
 ```txt
-Admin enters username/password
--> backend validates credentials
--> backend creates signed token
--> frontend stores token in localStorage
--> axios sends Authorization: Bearer <token>
--> protected backend routes verify token
+Browser opens app
+-> React renders app routes
+-> axios calls Express APIs directly
+-> backend handles templates, cards, uploads, and webhooks
 ```
 
-Admin credentials can come from:
+The admin portal and CRUD/upload APIs no longer require login or bearer-token authentication.
 
-1. `ADMIN_USERNAME` and `ADMIN_PASSWORD` in `.env`.
-2. `ADMIN_USERNAME` and `ADMIN_PASSWORD` in MongoDB `settings`.
-3. Fallback MongoDB `static_auth` document with key `admin-signin`.
-
-The token is not a library JWT. It is a small custom token:
-
-```txt
-base64url(JSON payload).HMAC_SHA256_signature
-```
-
-The signature uses `AUTH_SECRET`. Tokens expire after 24 hours.
-
-### Route Protection
+### API Routes
 
 Public routes:
 
 ```txt
-POST /api/auth/login
 GET  /api/files/:fileId
 GET  /api/google-form/health
 POST /api/google-form/digival-card
 ```
 
-Protected routes:
+App routes:
 
 ```txt
-GET    /api/auth/me
 POST   /api/uploads/photo
 POST   /api/uploads/image
 GET    /api/templates
@@ -107,7 +89,7 @@ DELETE /api/cards/:id
 
 `/api/files/:fileId` is public because browser image tags cannot send authorization headers.
 
-The Google Form route is public from login but protected by `x-webhook-secret`.
+The Google Form route remains protected by `x-webhook-secret`.
 
 ### CRUD Operations
 
@@ -124,8 +106,7 @@ Main collections:
 
 - `templates`: template design, fields, card size, category, default/custom flag.
 - `generatedcards`: saved card data, image URLs, QR data, source, template snapshot.
-- `settings`: runtime config such as auth secret, Drive credentials, webhook secret.
-- `static_auth`: optional fallback admin login document.
+- `settings`: runtime config such as Drive credentials, webhook secret, upload limits, and company defaults.
 
 ### Google Drive Storage
 
@@ -178,9 +159,8 @@ The frontend uses React local state and context:
 
 - `useState`: form fields, selected template, loading/saving flags.
 - `useEffect`: fetch templates/cards when pages load.
-- `useMemo`: memoize filtered card lists and auth context value.
-- `useContext`: share auth state through `AuthContext`.
-- React Router: protect pages and navigate between workflows.
+- `useMemo`: memoize filtered card lists and derived values.
+- React Router: navigate between workflows.
 
 There is no Redux or global data store.
 
@@ -202,10 +182,9 @@ dotenv.config()
 -> register health/public routes
 -> prepare server for /api requests
 -> connect MongoDB
--> check auth secret
 -> seed default templates
 -> mount public API routes
--> mount protected API routes
+-> mount app API routes
 -> mount 404 and error handlers
 ```
 
@@ -213,42 +192,34 @@ Business purpose:
 
 - API routes should not run until MongoDB is ready.
 - Default templates should always exist.
-- Protected routes should only run when token signing is configured.
 - The same Express app can run locally or on Vercel.
 
 ## 4. Main Workflows
 
-### Login Workflow
+### Access Workflow
 
 Files involved:
 
 ```txt
-frontend/src/pages/Login.jsx
-frontend/src/context/AuthContext.jsx
 frontend/src/services/api.js
-backend/routes/authRoutes.js
-backend/controllers/authController.js
-backend/utils/staticAuthService.js
-backend/utils/authTokenService.js
-backend/middleware/authMiddleware.js
+backend/server.js
+backend/routes/templateRoutes.js
+backend/routes/cardRoutes.js
+backend/routes/uploadRoutes.js
 ```
 
 Flow:
 
 ```txt
-Login.jsx submits username/password
--> authAPI.login posts to /api/auth/login
--> authController.login validates input
--> staticAuthService checks admin credentials
--> authTokenService creates signed token
--> frontend stores token and user in localStorage
--> axios interceptor sends token on future requests
--> ProtectedRoute allows admin pages
+User opens the frontend
+-> React Router renders app pages directly
+-> api.js sends requests without Authorization headers
+-> Express routes process CRUD and upload requests directly
 ```
 
 Code review explanation:
 
-The app uses one admin account. The backend validates credentials, returns a 24-hour signed token, and the frontend attaches that token to protected API requests. This avoids sessions and keeps deployment simple.
+The login and role-checking system has been removed. The app is open to anyone who can reach the frontend/backend URL, while the Google Form webhook still uses `x-webhook-secret`.
 
 ### Template CRUD Workflow
 
@@ -423,12 +394,12 @@ Code logic:
 - Exposes `/` and `/health`.
 - Uses `prepareServer()` before `/api` routes.
 - Mounts public routes first.
-- Mounts protected routes behind `protect`.
+- Mounts app API routes directly.
 - Registers not-found and error middleware.
 
 Business logic:
 
-- Makes sure MongoDB, auth secret, and default templates are ready before real API work.
+- Makes sure MongoDB and default templates are ready before real API work.
 - Keeps file streaming and Google Form webhook public for technical/business reasons.
 
 ### backend/api/index.js
@@ -478,7 +449,7 @@ Code logic:
 
 - Reads MongoDB `settings` document when connected.
 - Falls back to environment variables.
-- Supports aliases such as `authSecret`, `auth_secret`, and `AUTH_SECRET`.
+- Supports aliases for runtime settings such as CORS, webhook, Drive, upload, and background-removal fields.
 - Parses lists, booleans, byte sizes, and background-removal dimensions.
 - Caches Mongo settings briefly.
 
@@ -500,93 +471,9 @@ Business logic:
 
 - One flexible config document stores operational values like secrets, Drive credentials, upload limits, and company defaults.
 
-### backend/models/StaticAuth.js
+### Removed Auth Files
 
-Optional fallback admin account model.
-
-Code logic:
-
-- Collection name is `static_auth`.
-- Requires unique `key`.
-- Stores username and password.
-- Password field uses `select: false` by default.
-
-Business logic:
-
-- Provides MongoDB-based admin login if env/settings credentials are not used.
-
-### backend/utils/staticAuthService.js
-
-Admin credential validation.
-
-Code logic:
-
-- First reads `ADMIN_USERNAME` and `ADMIN_PASSWORD` from runtime config.
-- If missing, reads MongoDB `static_auth` document with key `admin-signin`.
-- Compares username and password using timing-safe comparison.
-- Returns `{ isConfigured, isValid, username }`.
-
-Business logic:
-
-- Keeps login simple: one configured admin account, no registration flow.
-
-### backend/utils/authTokenService.js
-
-Token signing and verification.
-
-Code logic:
-
-- Reads `AUTH_SECRET` from runtime config.
-- In production, missing secret throws an error.
-- In local development, creates a temporary in-memory secret if missing.
-- Creates 24-hour signed tokens.
-- Verifies token format, signature, and expiry.
-
-Business logic:
-
-- Provides stateless admin sessions without a session database.
-
-### backend/middleware/authMiddleware.js
-
-Protected route middleware.
-
-Code logic:
-
-- Reads `Authorization` header.
-- Extracts `Bearer <token>`.
-- Verifies token.
-- Adds `req.user`.
-- Returns 401 for missing, invalid, or expired tokens.
-
-Business logic:
-
-- Central place for route protection.
-
-### backend/controllers/authController.js
-
-Authentication API controller.
-
-Code logic:
-
-- `login` validates username/password presence.
-- Calls `validateAdminLogin`.
-- Returns 503 when no admin account is configured.
-- Returns 401 for invalid credentials.
-- Creates token and returns user object.
-- `getProfile` returns current authenticated user from `req.user`.
-
-Business logic:
-
-- Login is the entry point into the admin portal.
-
-### backend/routes/authRoutes.js
-
-Auth route definitions.
-
-Code logic:
-
-- `POST /login` is public.
-- `GET /me` is protected.
+The former login, token, static admin account, and route-protection files have been removed. Backend app routes are mounted directly in `server.js`.
 
 ### backend/models/Template.js
 
@@ -863,12 +750,11 @@ Code logic:
 - Creates React root.
 - Wraps app in `BrowserRouter`.
 - Uses basename `/ID-Generator`.
-- Wraps app in `AuthProvider`.
 - Imports global CSS.
 
 Business logic:
 
-- Makes auth state and routing available across the UI.
+- Sets up browser routing and global styles.
 
 ### frontend/src/App.jsx
 
@@ -876,14 +762,12 @@ Route tree.
 
 Code logic:
 
-- `/login` is inside `PublicRoute`.
-- Admin pages are inside `ProtectedRoute`.
-- `AppLayout` shows `Navbar` above protected pages.
+- `AppLayout` shows `Navbar` above app pages.
 - Unknown routes redirect to `/`.
 
 Business logic:
 
-- Only logged-in admins can access card features.
+- Anyone with access to the app URL can open card features.
 
 ### frontend/src/services/api.js
 
@@ -892,86 +776,24 @@ Axios API client.
 Code logic:
 
 - Computes API base URL.
-- Stores auth token/user in localStorage.
-- Adds bearer token to requests.
-- On 401, clears auth data and redirects to login.
-- Exposes `authAPI`, `templateAPI`, `cardAPI`, and `uploadAPI`.
+- Exposes `templateAPI`, `cardAPI`, and `uploadAPI`.
 - Resolves backend image paths into full URLs.
 
 Business logic:
 
 - Centralizes frontend/backend communication.
 
-### frontend/src/context/AuthContext.jsx
-
-Authentication state.
-
-Code logic:
-
-- Initializes token/user from localStorage.
-- `login` calls backend and stores token/user.
-- `logout` clears localStorage and state.
-- Provides `isAuthenticated`.
-
-Business logic:
-
-- Keeps login state available to routes, navbar, and pages.
-
-### frontend/src/components/ProtectedRoute.jsx
-
-Protected page guard.
-
-Code logic:
-
-- If no token, redirects to `/login`.
-- Stores previous location in route state.
-- Otherwise renders child route.
-
-Business logic:
-
-- Stops unauthenticated users from opening admin screens.
-
-### frontend/src/components/PublicRoute.jsx
-
-Public page guard.
-
-Code logic:
-
-- If already authenticated, redirects away from login to home.
-- Otherwise renders child route.
-
-Business logic:
-
-- Prevents logged-in admins from seeing login again.
-
 ### frontend/src/components/Navbar.jsx
 
-Admin navigation.
+Main navigation.
 
 Code logic:
 
 - Shows links for Home, Templates, Builder, Generate, Saved Cards.
-- Shows username.
-- Logout clears auth and navigates to login.
 
 Business logic:
 
-- Gives admin access to the main workflows.
-
-### frontend/src/pages/Login.jsx
-
-Login page.
-
-Code logic:
-
-- Manages username/password form state.
-- Calls `login` from `AuthContext`.
-- Redirects back to the originally requested page after login.
-- Shows backend error messages.
-
-Business logic:
-
-- Entry point for admin access.
+- Gives users access to the main workflows.
 
 ### frontend/src/pages/Home.jsx
 
@@ -984,7 +806,7 @@ Code logic:
 
 Business logic:
 
-- Starting point after admin login.
+- Starting point for the app.
 
 ### frontend/src/pages/TemplateGallery.jsx
 
@@ -1165,18 +987,10 @@ A generated card answers:
 
 Settings answer:
 
-- What is the auth secret?
-- What are the admin credentials?
 - What is the webhook secret?
 - What are the Google Drive credentials?
 - What are upload limits?
 - Is background removal enabled?
-
-### StaticAuth
-
-Static auth answers:
-
-- If env/settings admin credentials are not used, what MongoDB admin account should login validate against?
 
 ## 8. Code Review Explanation Script
 
@@ -1186,9 +1000,9 @@ Use this structure in your review:
 
 This is a MERN-based ID card generator. The frontend is a React admin portal. The backend is an Express API. MongoDB stores templates and generated cards, and Google Drive stores uploaded images. The app supports both manual card generation and automatic DigiVal card creation from Google Form submissions.
 
-### Authentication Explanation
+### Access Explanation
 
-Authentication is custom and token-based. The admin logs in with configured credentials. The backend validates them and returns a signed 24-hour token. The frontend stores the token in localStorage and sends it in the Authorization header. Protected backend routes use middleware to verify the token before allowing CRUD operations.
+The app no longer requires login or role checks. React routes render directly, and the frontend calls template, card, and upload APIs without bearer tokens. The Google Form webhook still validates `x-webhook-secret`.
 
 ### Template Explanation
 
@@ -1212,10 +1026,6 @@ The card preview renders both visible and hidden card sides. Export buttons clon
 
 ## 9. Important Validation And Security Points
 
-- Admin routes require bearer token authentication.
-- Tokens are signed with `AUTH_SECRET`.
-- Tokens expire after 24 hours.
-- Missing `AUTH_SECRET` is rejected in production.
 - Uploads only accept image MIME types.
 - Upload size is controlled by runtime config.
 - Inline base64 images are rejected when saving cards.
@@ -1231,9 +1041,6 @@ Minimum local backend setup:
 ```env
 PORT=5000
 MONGO_URI=your MongoDB connection string
-AUTH_SECRET=a long random secret
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=a strong admin password
 ```
 
 For uploads:
@@ -1271,7 +1078,7 @@ Because images are large. MongoDB should store card data and image URLs, while G
 
 ### Why is `/api/files/:fileId` public?
 
-Because `<img>` tags cannot attach bearer tokens. The file ID route is public, validates file ID format, and streams the image from Drive.
+The file ID route is public, validates file ID format, and streams the image from Drive so previews and exports can load images normally.
 
 ### Why use a template snapshot?
 
@@ -1285,28 +1092,23 @@ Default templates are seeded by the app. Protecting them keeps baseline template
 
 The background-removal package uses native image dependencies. Running it in a worker process avoids conflicts with the main API process.
 
-### Why use custom token instead of session?
-
-The app has a single admin role and simple deployment needs. A signed stateless token is enough for this scope.
-
 ### What is the difference between manual and Google Form cards?
 
-Manual cards are created by an admin in the React UI. Google Form cards are created automatically by the webhook and saved with `source: "google-form"`.
+Manual cards are created in the React UI. Google Form cards are created automatically by the webhook and saved with `source: "google-form"`.
 
 ## 12. End-to-End Demo Order
 
 For a project review, demo in this order:
 
-1. Login as admin.
-2. Open Template Gallery and explain seeded templates.
-3. Open Template Builder and explain fields, positions, and preview.
-4. Generate a card from a template.
-5. Upload a photo and explain Drive storage.
-6. Save the generated card.
-7. Open Saved Cards and show edit/delete/export.
-8. Explain Google Form automation with the webhook flow.
-9. Show backend route protection and token flow.
+1. Open Template Gallery and explain seeded templates.
+2. Open Template Builder and explain fields, positions, and preview.
+3. Generate a card from a template.
+4. Upload a photo and explain Drive storage.
+5. Save the generated card.
+6. Open Saved Cards and show edit/delete/export.
+7. Explain Google Form automation with the webhook flow.
+8. Show that app routes are available without login and that the webhook still uses `x-webhook-secret`.
 
 ## 13. One-Minute Summary
 
-This project is a MERN ID card generation system. The admin logs in with configured credentials and receives a signed token. Protected React pages call Express APIs with that token. Templates in MongoDB define card design and dynamic fields. The frontend uses those fields to build forms and live previews. Uploaded images go through the backend, optionally through background removal, then into Google Drive. Generated cards store form data, image URLs, QR data, and a template snapshot in MongoDB. A separate Google Form webhook can automatically create DigiVal cards from submitted form data and uploaded photos.
+This project is a MERN ID card generation system. React pages call Express APIs directly without login. Templates in MongoDB define card design and dynamic fields. The frontend uses those fields to build forms and live previews. Uploaded images go through the backend, optionally through background removal, then into Google Drive. Generated cards store form data, image URLs, QR data, and a template snapshot in MongoDB. A separate Google Form webhook can automatically create DigiVal cards from submitted form data and uploaded photos.
